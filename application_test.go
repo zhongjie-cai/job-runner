@@ -847,6 +847,7 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 	runApplicationFuncExpected = 1
 	runApplicationFunc = func(app *application) {
 		runApplicationFuncCalled++
+		assert.True(t, dummyApplication.started)
 		assert.Equal(t, dummyApplication, app)
 		dummyShutdown <- true
 	}
@@ -873,6 +874,7 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 	)
 
 	// assert
+	assert.False(t, dummyApplication.started)
 
 	// verify
 	verifyAll(t)

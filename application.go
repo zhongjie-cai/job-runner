@@ -189,8 +189,10 @@ func beginApplication(app *application) {
 		app.name,
 		app.version,
 	)
+	app.started = true
 	go runApplicationFunc(app)
 	<-app.shutdown
+	app.started = false
 	logAppRootFunc(
 		app.session,
 		"application",

@@ -16,20 +16,21 @@ package main
 
 import (
 	"fmt"
-	"net/http"
+	"time"
 
 	jobrunner "github.com/zhongjie-cai/job-runner"
 )
 
-// This is a sample of how to setup application for running the runner
+// This is a sample of how to setup application for a job runner
 func main() {
+	var period = time.Second * 5
 	var application = jobrunner.NewApplication(
-		"my job runner",
-		18605,
-		"0.0.1",
+		"some job runner",
+		"1.2.3",
+		3,       // this instructs the application to start 3 instances for each round of job execution, each assigned with a dedicated session and sequential index
+		&period, // this instructs the application to repeat the job execution rounds for every given period; a new round would start even if the previous round has not finished
 		&myCustomization{},
 	)
-	defer application.Stop()
 	application.Start()
 }
 
@@ -41,6 +42,17 @@ type myCustomization struct {
 
 func (customization *myCustomization) Log(session jobrunner.Session, logType jobrunner.LogType, logLevel jobrunner.LogLevel, category, subcategory, description string) {
 	fmt.Printf("[%v|%v] <%v|%v> %v\n", logType, logLevel, category, subcategory, description)
+}
+
+func (customization *myCustomization) ActionFunc(session jobrunner.Session) error {
+	session.LogMethodLogic(
+		jobrunner.LogLevelInfo,
+		"test category",
+		"test subcategory",
+		"I am a running job for %v",
+		session.GetIndex(),
+	)
+	return nil
 }
 ```
 
