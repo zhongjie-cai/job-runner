@@ -210,6 +210,119 @@ func TestDefaultCustomization_PostAction(t *testing.T) {
 	verifyAll(t)
 }
 
+func TestDefaultCustomization_ActionFunc(t *testing.T) {
+	// arrange
+	var dummySession Session
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var err = customizationDefault.ActionFunc(dummySession)
+
+	// assert
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDefaultCustomization_RecoverPanic_NilRecoverResult(t *testing.T) {
+	// arrange
+	var dummySession Session
+	var dummyRecoverResult *int
+
+	// mock
+	createMock(t)
+
+	// expect
+	isInterfaceValueNilFuncExpected = 1
+	isInterfaceValueNilFunc = func(i interface{}) bool {
+		isInterfaceValueNilFuncCalled++
+		assert.Equal(t, dummyRecoverResult, i)
+		return true
+	}
+
+	// SUT + act
+	var err = customizationDefault.RecoverPanic(
+		dummySession,
+		dummyRecoverResult,
+	)
+
+	// assert
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDefaultCustomization_RecoverPanic_RecoverResultAsError(t *testing.T) {
+	// arrange
+	var dummySession Session
+	var dummyRecoverResult = errors.New("some recover result")
+
+	// mock
+	createMock(t)
+
+	// expect
+	isInterfaceValueNilFuncExpected = 1
+	isInterfaceValueNilFunc = func(i interface{}) bool {
+		isInterfaceValueNilFuncCalled++
+		assert.Equal(t, dummyRecoverResult, i)
+		return false
+	}
+
+	// SUT + act
+	var err = customizationDefault.RecoverPanic(
+		dummySession,
+		dummyRecoverResult,
+	)
+
+	// assert
+	assert.Equal(t, dummyRecoverResult, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDefaultCustomization_RecoverPanic_RecoverResultAsNonError(t *testing.T) {
+	// arrange
+	var dummySession Session
+	var dummyRecoverResult = "some recover result"
+	var dummyError = errors.New("some error")
+
+	// mock
+	createMock(t)
+
+	// expect
+	isInterfaceValueNilFuncExpected = 1
+	isInterfaceValueNilFunc = func(i interface{}) bool {
+		isInterfaceValueNilFuncCalled++
+		assert.Equal(t, dummyRecoverResult, i)
+		return false
+	}
+	fmtErrorfExpected = 1
+	fmtErrorf = func(format string, a ...interface{}) error {
+		fmtErrorfCalled++
+		assert.Equal(t, "%v", format)
+		assert.Equal(t, 1, len(a))
+		assert.Equal(t, dummyRecoverResult, a[0])
+		return dummyError
+	}
+
+	// SUT + act
+	var err = customizationDefault.RecoverPanic(
+		dummySession,
+		dummyRecoverResult,
+	)
+
+	// assert
+	assert.Equal(t, dummyError, err)
+
+	// verify
+	verifyAll(t)
+}
+
 func TestDefaultCustomization_ClientCert(t *testing.T) {
 	// mock
 	createMock(t)

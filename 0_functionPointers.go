@@ -31,6 +31,7 @@ var (
 	logAppRootFunc            = logAppRoot
 	handleSessionFunc         = handleSession
 	runInstancesFunc          = runInstances
+	repeatExecutionFunc       = repeatExecution
 	timeAfter                 = time.After
 	runApplicationFunc        = runApplication
 	initializeHTTPClientsFunc = initializeHTTPClients
@@ -56,6 +57,7 @@ var (
 	logProcessRequestFunc  = logProcessRequest
 	logProcessResponseFunc = logProcessResponse
 	logProcessExitFunc     = logProcessExit
+	processSessionFunc     = processSession
 )
 
 // func pointers for injection / testing: jsonutil.go

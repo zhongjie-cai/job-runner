@@ -1,6 +1,8 @@
 package jobrunner
 
-import "time"
+import (
+	"time"
+)
 
 func initiateSession(
 	app *application,
@@ -30,6 +32,31 @@ func finalizeSession(
 		errorResult,
 		recoverError,
 	)
+}
+
+func processSession(
+	session Session,
+	customization Customization,
+) error {
+	var preActionError = customization.PreAction(
+		session,
+	)
+	if preActionError != nil {
+		return preActionError
+	}
+	var actionError = customization.ActionFunc(
+		session,
+	)
+	if actionError != nil {
+		return actionError
+	}
+	var postActionError = customization.PostAction(
+		session,
+	)
+	if postActionError != nil {
+		return postActionError
+	}
+	return nil
 }
 
 // handleSession wraps the HTTP handler with session related operations
@@ -76,23 +103,8 @@ func handleSession(
 	}(
 		getTimeNowUTCFunc(),
 	)
-	var preActionError = app.customization.PreAction(
+	return processSessionFunc(
 		session,
+		app.customization,
 	)
-	if preActionError != nil {
-		return preActionError
-	}
-	var actionError = app.customization.ActionFunc(
-		session,
-	)
-	if actionError != nil {
-		return actionError
-	}
-	var postActionError = app.customization.PostAction(
-		session,
-	)
-	if postActionError != nil {
-		return postActionError
-	}
-	return nil
 }

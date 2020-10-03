@@ -153,20 +153,29 @@ func runInstances(app *application) {
 	waitGroup.Wait()
 }
 
+func repeatExecution(app *application) {
+	for {
+		go runInstancesFunc(
+			app,
+		)
+		<-timeAfter(
+			*app.repeat,
+		)
+		if !app.started {
+			break
+		}
+	}
+}
+
 func runApplication(app *application) {
 	if app.repeat == nil {
 		runInstancesFunc(
 			app,
 		)
 	} else {
-		for {
-			go runInstancesFunc(
-				app,
-			)
-			<-timeAfter(
-				*app.repeat,
-			)
-		}
+		repeatExecutionFunc(
+			app,
+		)
 	}
 	app.shutdown <- true
 }

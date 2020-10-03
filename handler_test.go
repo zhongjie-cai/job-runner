@@ -1,572 +1,476 @@
 package jobrunner
 
-// import (
-// 	"errors"
-// 	"math/rand"
-// 	"net/http"
-// 	"strconv"
-// 	"strings"
-// 	"testing"
-// 	"time"
+import (
+	"errors"
+	"math/rand"
+	"testing"
+	"time"
 
-// 	"github.com/google/uuid"
-// 	"github.com/stretchr/testify/assert"
-// )
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+)
 
-// func TestGetRequestedPort_NilRequest(t *testing.T) {
-// 	// arrange
-// 	var dummyHTTPRequest *http.Request
+func TestInitiateSession(t *testing.T) {
+	// arrange
+	var dummyCustomization = &dummyCustomization{t: t}
+	var dummyApplication = &application{
+		customization: dummyCustomization,
+	}
+	var dummyIndex = rand.Intn(65536)
+	var dummySessionID = uuid.New()
 
-// 	// mock
-// 	createMock(t)
+	// mock
+	createMock(t)
 
-// 	// SUT + act
-// 	var result = getRequestedPort(
-// 		dummyHTTPRequest,
-// 	)
+	// expect
+	uuidNewExpected = 1
+	uuidNew = func() uuid.UUID {
+		uuidNewCalled++
+		return dummySessionID
+	}
 
-// 	// assert
-// 	assert.Zero(t, result)
+	// SUT + act
+	var session = initiateSession(
+		dummyApplication,
+		dummyIndex,
+	)
 
-// 	// verify
-// 	verifyAll(t)
-// }
+	// assert
+	assert.NotNil(t, session)
+	assert.Equal(t, dummySessionID, session.id)
+	assert.Equal(t, dummyIndex, session.index)
+	assert.Empty(t, session.attachment)
+	assert.Equal(t, dummyCustomization, session.customization)
 
-// func TestGetRequestedPort_NoPort(t *testing.T) {
-// 	// arrange
-// 	var dummyHost = "some host"
-// 	var dummyHTTPRequest = &http.Request{
-// 		Host: dummyHost,
-// 	}
+	// verify
+	verifyAll(t)
+}
 
-// 	// mock
-// 	createMock(t)
+type dummyCustomizationRecoverPanic struct {
+	dummyCustomization
+	recoverPanic func(session Session, recoverResult interface{}) error
+}
 
-// 	// expect
-// 	stringsSplitExpected = 1
-// 	stringsSplit = func(s, sep string) []string {
-// 		stringsSplitCalled++
-// 		assert.Equal(t, dummyHost, s)
-// 		assert.Equal(t, ":", sep)
-// 		return strings.Split(s, sep)
-// 	}
+func (dummyCustomizationRecoverPanic *dummyCustomizationRecoverPanic) RecoverPanic(session Session, recoverResult interface{}) error {
+	if dummyCustomizationRecoverPanic.recoverPanic != nil {
+		return dummyCustomizationRecoverPanic.recoverPanic(session, recoverResult)
+	}
+	assert.Fail(dummyCustomizationRecoverPanic.t, "Unexpected call to RecoverPanic")
+	return nil
+}
 
-// 	// SUT + act
-// 	var result = getRequestedPort(
-// 		dummyHTTPRequest,
-// 	)
+func TestFinalizeSession_NoErrorResult(t *testing.T) {
+	// arrange
+	var dummyCustomizationRecoverPanic = &dummyCustomizationRecoverPanic{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var dummySession = &session{
+		customization: dummyCustomizationRecoverPanic,
+	}
+	var dummyErrorResult error
+	var dummyRecoverError = errors.New("some recover error")
+	var customizationRecoverPanicExpected int
+	var customizationRecoverPanicCalled int
 
-// 	// assert
-// 	assert.Zero(t, result)
+	// mock
+	createMock(t)
 
-// 	// verify
-// 	verifyAll(t)
-// }
+	// expect
+	customizationRecoverPanicExpected = 1
+	dummyCustomizationRecoverPanic.recoverPanic = func(session Session, recoverResult interface{}) error {
+		customizationRecoverPanicCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, recover(), recoverResult)
+		return dummyRecoverError
+	}
 
-// func TestGetRequestedPort_InvalidPort(t *testing.T) {
-// 	// arrange
-// 	var dummyPort = "some port"
-// 	var dummyHost = "some host:" + dummyPort
-// 	var dummyHTTPRequest = &http.Request{
-// 		Host: dummyHost,
-// 	}
+	// SUT + act
+	var err = finalizeSession(
+		dummySession,
+		dummyErrorResult,
+	)
 
-// 	// mock
-// 	createMock(t)
+	// assert
+	assert.Equal(t, dummyRecoverError, err)
 
-// 	// expect
-// 	stringsSplitExpected = 1
-// 	stringsSplit = func(s, sep string) []string {
-// 		stringsSplitCalled++
-// 		assert.Equal(t, dummyHost, s)
-// 		assert.Equal(t, ":", sep)
-// 		return strings.Split(s, sep)
-// 	}
-// 	strconvAtoiExpected = 1
-// 	strconvAtoi = func(s string) (int, error) {
-// 		strconvAtoiCalled++
-// 		assert.Equal(t, dummyPort, s)
-// 		return strconv.Atoi(s)
-// 	}
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationRecoverPanicExpected, customizationRecoverPanicCalled, "Unexpected number of calls to method customization.RecoverPanic")
+}
 
-// 	// SUT + act
-// 	var result = getRequestedPort(
-// 		dummyHTTPRequest,
-// 	)
+func TestFinalizeSession_WithErrorResult(t *testing.T) {
+	// arrange
+	var dummyCustomizationRecoverPanic = &dummyCustomizationRecoverPanic{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var dummySession = &session{
+		customization: dummyCustomizationRecoverPanic,
+	}
+	var dummyErrorResult = errors.New("some error result")
+	var dummyRecoverError = errors.New("some recover error")
+	var dummyError = errors.New("some error")
+	var customizationRecoverPanicExpected int
+	var customizationRecoverPanicCalled int
 
-// 	// assert
-// 	assert.Zero(t, result)
+	// mock
+	createMock(t)
 
-// 	// verify
-// 	verifyAll(t)
-// }
+	// expect
+	customizationRecoverPanicExpected = 1
+	dummyCustomizationRecoverPanic.recoverPanic = func(session Session, recoverResult interface{}) error {
+		customizationRecoverPanicCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, recover(), recoverResult)
+		return dummyRecoverError
+	}
+	fmtErrorfExpected = 1
+	fmtErrorf = func(format string, a ...interface{}) error {
+		fmtErrorfCalled++
+		assert.Equal(t, "Original Error: %w\nRecover Error: %v", format)
+		assert.Equal(t, 2, len(a))
+		assert.Equal(t, dummyErrorResult, a[0])
+		assert.Equal(t, dummyRecoverError, a[1])
+		return dummyError
+	}
 
-// func TestGetRequestedPort_Success(t *testing.T) {
-// 	// arrange
-// 	var dummyPortValue = rand.Intn(65536)
-// 	var dummyPortString = strconv.Itoa(dummyPortValue)
-// 	var dummyHost = "some host:" + dummyPortString
-// 	var dummyHTTPRequest = &http.Request{
-// 		Host: dummyHost,
-// 	}
+	// SUT + act
+	var err = finalizeSession(
+		dummySession,
+		dummyErrorResult,
+	)
 
-// 	// mock
-// 	createMock(t)
+	// assert
+	assert.Equal(t, dummyError, err)
 
-// 	// expect
-// 	stringsSplitExpected = 1
-// 	stringsSplit = func(s, sep string) []string {
-// 		stringsSplitCalled++
-// 		assert.Equal(t, dummyHost, s)
-// 		assert.Equal(t, ":", sep)
-// 		return strings.Split(s, sep)
-// 	}
-// 	strconvAtoiExpected = 1
-// 	strconvAtoi = func(s string) (int, error) {
-// 		strconvAtoiCalled++
-// 		assert.Equal(t, dummyPortString, s)
-// 		return strconv.Atoi(s)
-// 	}
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationRecoverPanicExpected, customizationRecoverPanicCalled, "Unexpected number of calls to method customization.RecoverPanic")
+}
 
-// 	// SUT + act
-// 	var result = getRequestedPort(
-// 		dummyHTTPRequest,
-// 	)
+type dummyCustomizationProcessSession struct {
+	dummyCustomization
+	preAction  func(Session) error
+	actionFunc func(Session) error
+	postAction func(Session) error
+}
 
-// 	// assert
-// 	assert.Equal(t, dummyPortValue, result)
+func (dummyCustomizationProcessSession *dummyCustomizationProcessSession) PreAction(session Session) error {
+	if dummyCustomizationProcessSession.preAction != nil {
+		return dummyCustomizationProcessSession.preAction(session)
+	}
+	assert.Fail(dummyCustomizationProcessSession.t, "Unexpected call to PreAction")
+	return nil
+}
 
-// 	// verify
-// 	verifyAll(t)
-// }
+func (dummyCustomizationProcessSession *dummyCustomizationProcessSession) ActionFunc(session Session) error {
+	if dummyCustomizationProcessSession.actionFunc != nil {
+		return dummyCustomizationProcessSession.actionFunc(session)
+	}
+	assert.Fail(dummyCustomizationProcessSession.t, "Unexpected call to ActionFunc")
+	return nil
+}
 
-// func TestInitiateSession(t *testing.T) {
-// 	// arrange
-// 	var dummyResponseWriter = &dummyResponseWriter{t: t}
-// 	var dummyHTTPRequest = &http.Request{Host: "some host"}
-// 	var dummyPort = rand.Intn(65536)
-// 	var dummyCustomization = &dummyCustomization{t: t}
-// 	var dummyAction = func(session Session) (interface{}, error) { return nil, nil }
-// 	var dummyActionFuncMap = map[string]ActionFunc{
-// 		"some key": dummyAction,
-// 	}
-// 	var dummyApplication = &application{
-// 		customization: dummyCustomization,
-// 		actionFuncMap: dummyActionFuncMap,
-// 	}
-// 	var dummyEndpoint = "some endpoint"
-// 	var dummyRouteError = errors.New("some route error")
-// 	var dummySessionID = uuid.New()
+func (dummyCustomizationProcessSession *dummyCustomizationProcessSession) PostAction(session Session) error {
+	if dummyCustomizationProcessSession.postAction != nil {
+		return dummyCustomizationProcessSession.postAction(session)
+	}
+	assert.Fail(dummyCustomizationProcessSession.t, "Unexpected call to PostAction")
+	return nil
+}
 
-// 	// mock
-// 	createMock(t)
+func TestProcessSession_PreActionError(t *testing.T) {
+	// arrange
+	var dummySession = &dummySession{t: t}
+	var dummyCustomizationProcessSession = &dummyCustomizationProcessSession{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var dummyError = errors.New("some error")
+	var customizationPreActionExpected int
+	var customizationPreActionCalled int
+	var customizationActionFuncExpected int
+	var customizationActionFuncCalled int
+	var customizationPostActionExpected int
+	var customizationPostActionCalled int
 
-// 	// expect
-// 	getRequestedPortFuncExpected = 1
-// 	getRequestedPortFunc = func(httpRequest *http.Request) int {
-// 		getRequestedPortFuncCalled++
-// 		assert.Equal(t, dummyHTTPRequest, httpRequest)
-// 		return dummyPort
-// 	}
-// 	getApplicationFuncExpected = 1
-// 	getApplicationFunc = func(port int) *application {
-// 		getApplicationFuncCalled++
-// 		assert.Equal(t, dummyPort, port)
-// 		return dummyApplication
-// 	}
-// 	uuidNewExpected = 1
-// 	uuidNew = func() uuid.UUID {
-// 		uuidNewCalled++
-// 		return dummySessionID
-// 	}
-// 	getRouteInfoFuncExpected = 1
-// 	getRouteInfoFunc = func(httpRequest *http.Request, actionFuncMap map[string]ActionFunc) (string, ActionFunc, error) {
-// 		getRouteInfoFuncCalled++
-// 		assert.Equal(t, dummyHTTPRequest, httpRequest)
-// 		assert.Equal(t, dummyActionFuncMap, actionFuncMap)
-// 		return dummyEndpoint, dummyAction, dummyRouteError
-// 	}
+	// mock
+	createMock(t)
 
-// 	// SUT + act
-// 	var session, action, err = initiateSession(
-// 		dummyResponseWriter,
-// 		dummyHTTPRequest,
-// 	)
+	// expect
+	customizationPreActionExpected = 1
+	dummyCustomizationProcessSession.preAction = func(session Session) error {
+		customizationPreActionCalled++
+		assert.Equal(t, dummySession, session)
+		return dummyError
+	}
 
-// 	// assert
-// 	assert.NotNil(t, session)
-// 	assert.Equal(t, dummySessionID, session.id)
-// 	assert.Equal(t, dummyEndpoint, session.name)
-// 	assert.Equal(t, dummyHTTPRequest, session.request)
-// 	assert.Equal(t, dummyResponseWriter, session.responseWriter)
-// 	assert.Empty(t, session.attachment)
-// 	assert.Equal(t, dummyCustomization, session.customization)
-// 	functionPointerEquals(t, dummyAction, action)
-// 	assert.Equal(t, dummyRouteError, err)
+	// SUT + act
+	var err = processSession(
+		dummySession,
+		dummyCustomizationProcessSession,
+	)
 
-// 	// verify
-// 	verifyAll(t)
-// }
+	// assert
+	assert.Equal(t, dummyError, err)
 
-// func TestFinalizeSession(t *testing.T) {
-// 	// arrange
-// 	var dummyName = "some name"
-// 	var dummyMethod = "some method"
-// 	var dummyHTTPRequest = &http.Request{
-// 		Method: dummyMethod,
-// 	}
-// 	var dummySession = &session{
-// 		name:    dummyName,
-// 		request: dummyHTTPRequest,
-// 	}
-// 	var dummyStartTime = time.Now().UTC()
-// 	var dummyDuration = time.Duration(rand.Intn(100))
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
+	assert.Equal(t, customizationActionFuncExpected, customizationActionFuncCalled, "Unexpected number of calls to method customization.ActionFunc")
+	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
+}
 
-// 	// mock
-// 	createMock(t)
+func TestProcessSession_ActionFuncError(t *testing.T) {
+	// arrange
+	var dummySession = &dummySession{t: t}
+	var dummyCustomizationProcessSession = &dummyCustomizationProcessSession{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var dummyError = errors.New("some error")
+	var customizationPreActionExpected int
+	var customizationPreActionCalled int
+	var customizationActionFuncExpected int
+	var customizationActionFuncCalled int
+	var customizationPostActionExpected int
+	var customizationPostActionCalled int
 
-// 	// expect
-// 	handlePanicFuncExpected = 1
-// 	handlePanicFunc = func(session *session, recoverResult interface{}) {
-// 		handlePanicFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, recover(), recoverResult)
-// 	}
-// 	logEndpointExitFuncExpected = 1
-// 	logEndpointExitFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-// 		logEndpointExitFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyName, category)
-// 		assert.Equal(t, dummyMethod, subcategory)
-// 		assert.Equal(t, "%s", messageFormat)
-// 		assert.Equal(t, 1, len(parameters))
-// 		assert.Equal(t, dummyDuration, parameters[0])
-// 	}
-// 	timeSinceExpected = 1
-// 	timeSince = func(tm time.Time) time.Duration {
-// 		timeSinceCalled++
-// 		assert.Equal(t, dummyStartTime, tm)
-// 		return dummyDuration
-// 	}
+	// mock
+	createMock(t)
 
-// 	// SUT + act
-// 	finalizeSession(
-// 		dummySession,
-// 		dummyStartTime,
-// 	)
+	// expect
+	customizationPreActionExpected = 1
+	dummyCustomizationProcessSession.preAction = func(session Session) error {
+		customizationPreActionCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
+	customizationActionFuncExpected = 1
+	dummyCustomizationProcessSession.actionFunc = func(session Session) error {
+		customizationActionFuncCalled++
+		assert.Equal(t, dummySession, session)
+		return dummyError
+	}
 
-// 	// verify
-// 	verifyAll(t)
-// }
+	// SUT + act
+	var err = processSession(
+		dummySession,
+		dummyCustomizationProcessSession,
+	)
 
-// type dummyCustomizationHandleAction struct {
-// 	dummyCustomization
-// 	preAction  func(session Session) error
-// 	postAction func(session Session) error
-// }
+	// assert
+	assert.Equal(t, dummyError, err)
 
-// func (dummySession *dummyCustomizationHandleAction) PreAction(session Session) error {
-// 	if dummySession.preAction != nil {
-// 		return dummySession.preAction(session)
-// 	}
-// 	assert.Fail(dummySession.t, "Unexpected call to PreAction")
-// 	return nil
-// }
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
+	assert.Equal(t, customizationActionFuncExpected, customizationActionFuncCalled, "Unexpected number of calls to method customization.ActionFunc")
+	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
+}
 
-// func (dummySession *dummyCustomizationHandleAction) PostAction(session Session) error {
-// 	if dummySession.postAction != nil {
-// 		return dummySession.postAction(session)
-// 	}
-// 	assert.Fail(dummySession.t, "Unexpected call to PostAction")
-// 	return nil
-// }
+func TestProcessSession_PostActionError(t *testing.T) {
+	// arrange
+	var dummySession = &dummySession{t: t}
+	var dummyCustomizationProcessSession = &dummyCustomizationProcessSession{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var dummyError = errors.New("some error")
+	var customizationPreActionExpected int
+	var customizationPreActionCalled int
+	var customizationActionFuncExpected int
+	var customizationActionFuncCalled int
+	var customizationPostActionExpected int
+	var customizationPostActionCalled int
 
-// func TestHandleAction_PreActionError(t *testing.T) {
-// 	// arrange
-// 	var dummyCustomizationHandleAction = &dummyCustomizationHandleAction{
-// 		dummyCustomization: dummyCustomization{t: t},
-// 	}
-// 	var dummySession = &session{
-// 		customization: dummyCustomizationHandleAction,
-// 	}
-// 	var customizationPreActionExpected int
-// 	var customizationPreActionCalled int
-// 	var dummyActionExpected int
-// 	var dummyActionCalled int
-// 	var dummyAction ActionFunc
-// 	var customizationPostActionExpected int
-// 	var customizationPostActionCalled int
-// 	var dummyError = errors.New("some error")
+	// mock
+	createMock(t)
 
-// 	// mock
-// 	createMock(t)
+	// expect
+	customizationPreActionExpected = 1
+	dummyCustomizationProcessSession.preAction = func(session Session) error {
+		customizationPreActionCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
+	customizationActionFuncExpected = 1
+	dummyCustomizationProcessSession.actionFunc = func(session Session) error {
+		customizationActionFuncCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
+	customizationPostActionExpected = 1
+	dummyCustomizationProcessSession.postAction = func(session Session) error {
+		customizationPostActionCalled++
+		assert.Equal(t, dummySession, session)
+		return dummyError
+	}
 
-// 	// expect
-// 	customizationPreActionExpected = 1
-// 	dummyCustomizationHandleAction.preAction = func(session Session) error {
-// 		customizationPreActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return dummyError
-// 	}
-// 	writeResponseFuncExpected = 1
-// 	writeResponseFunc = func(session *session, responseObject interface{}, responseError error) {
-// 		writeResponseFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Nil(t, responseObject)
-// 		assert.Equal(t, dummyError, responseError)
-// 	}
+	// SUT + act
+	var err = processSession(
+		dummySession,
+		dummyCustomizationProcessSession,
+	)
 
-// 	// SUT + act
-// 	handleAction(
-// 		dummySession,
-// 		dummyAction,
-// 	)
+	// assert
+	assert.Equal(t, dummyError, err)
 
-// 	// verify
-// 	verifyAll(t)
-// 	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
-// 	assert.Equal(t, dummyActionExpected, dummyActionCalled, "Unexpected number of calls to method dummyAction")
-// 	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
-// }
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
+	assert.Equal(t, customizationActionFuncExpected, customizationActionFuncCalled, "Unexpected number of calls to method customization.ActionFunc")
+	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
+}
 
-// func TestHandleAction_ResponseError(t *testing.T) {
-// 	// arrange
-// 	var dummyCustomizationHandleAction = &dummyCustomizationHandleAction{
-// 		dummyCustomization: dummyCustomization{t: t},
-// 	}
-// 	var dummySession = &session{
-// 		customization: dummyCustomizationHandleAction,
-// 	}
-// 	var customizationPreActionExpected int
-// 	var customizationPreActionCalled int
-// 	var dummyActionExpected int
-// 	var dummyActionCalled int
-// 	var dummyAction ActionFunc
-// 	var customizationPostActionExpected int
-// 	var customizationPostActionCalled int
-// 	var dummyResponseObject = rand.Int()
-// 	var dummyError = errors.New("some error")
+func TestProcessSession_Success(t *testing.T) {
+	// arrange
+	var dummySession = &dummySession{t: t}
+	var dummyCustomizationProcessSession = &dummyCustomizationProcessSession{
+		dummyCustomization: dummyCustomization{t: t},
+	}
+	var customizationPreActionExpected int
+	var customizationPreActionCalled int
+	var customizationActionFuncExpected int
+	var customizationActionFuncCalled int
+	var customizationPostActionExpected int
+	var customizationPostActionCalled int
 
-// 	// mock
-// 	createMock(t)
+	// mock
+	createMock(t)
 
-// 	// expect
-// 	customizationPreActionExpected = 1
-// 	dummyCustomizationHandleAction.preAction = func(session Session) error {
-// 		customizationPreActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return nil
-// 	}
-// 	dummyActionExpected = 1
-// 	dummyAction = func(session Session) (interface{}, error) {
-// 		dummyActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return dummyResponseObject, dummyError
-// 	}
-// 	writeResponseFuncExpected = 1
-// 	writeResponseFunc = func(session *session, responseObject interface{}, responseError error) {
-// 		writeResponseFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyResponseObject, responseObject)
-// 		assert.Equal(t, dummyError, responseError)
-// 	}
+	// expect
+	customizationPreActionExpected = 1
+	dummyCustomizationProcessSession.preAction = func(session Session) error {
+		customizationPreActionCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
+	customizationActionFuncExpected = 1
+	dummyCustomizationProcessSession.actionFunc = func(session Session) error {
+		customizationActionFuncCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
+	customizationPostActionExpected = 1
+	dummyCustomizationProcessSession.postAction = func(session Session) error {
+		customizationPostActionCalled++
+		assert.Equal(t, dummySession, session)
+		return nil
+	}
 
-// 	// SUT + act
-// 	handleAction(
-// 		dummySession,
-// 		dummyAction,
-// 	)
+	// SUT + act
+	var err = processSession(
+		dummySession,
+		dummyCustomizationProcessSession,
+	)
 
-// 	// verify
-// 	verifyAll(t)
-// 	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
-// 	assert.Equal(t, dummyActionExpected, dummyActionCalled, "Unexpected number of calls to method dummyAction")
-// 	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
-// }
+	// assert
+	assert.NoError(t, err)
 
-// func TestHandleAction_HappyPath(t *testing.T) {
-// 	// arrange
-// 	var dummyCustomizationHandleAction = &dummyCustomizationHandleAction{
-// 		dummyCustomization: dummyCustomization{t: t},
-// 	}
-// 	var dummySession = &session{
-// 		customization: dummyCustomizationHandleAction,
-// 	}
-// 	var customizationPreActionExpected int
-// 	var customizationPreActionCalled int
-// 	var dummyActionExpected int
-// 	var dummyActionCalled int
-// 	var dummyAction ActionFunc
-// 	var customizationPostActionExpected int
-// 	var customizationPostActionCalled int
-// 	var dummyResponseObject = rand.Int()
-// 	var dummyError = errors.New("some error")
+	// verify
+	verifyAll(t)
+	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
+	assert.Equal(t, customizationActionFuncExpected, customizationActionFuncCalled, "Unexpected number of calls to method customization.ActionFunc")
+	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
+}
 
-// 	// mock
-// 	createMock(t)
+func TestHandleSession_HappyPath(t *testing.T) {
+	// arrange
+	var dummyName = "some name"
+	var dummyCustomization = &dummyCustomization{t: t}
+	var dummyApplication = &application{
+		name:          dummyName,
+		customization: dummyCustomization,
+	}
+	var dummyIndex = rand.Int()
+	var dummySession = &session{id: uuid.New()}
+	var dummyTimeNow = time.Now()
+	var dummyDuration = time.Duration(rand.Intn(100))
+	var dummyProcessError = errors.New("some process error")
+	var dummyFinalError = errors.New("some final error")
 
-// 	// expect
-// 	customizationPreActionExpected = 1
-// 	dummyCustomizationHandleAction.preAction = func(session Session) error {
-// 		customizationPreActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return nil
-// 	}
-// 	dummyActionExpected = 1
-// 	dummyAction = func(session Session) (interface{}, error) {
-// 		dummyActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return dummyResponseObject, nil
-// 	}
-// 	customizationPostActionExpected = 1
-// 	dummyCustomizationHandleAction.postAction = func(session Session) error {
-// 		customizationPostActionCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		return dummyError
-// 	}
-// 	writeResponseFuncExpected = 1
-// 	writeResponseFunc = func(session *session, responseObject interface{}, responseError error) {
-// 		writeResponseFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyResponseObject, responseObject)
-// 		assert.Equal(t, dummyError, responseError)
-// 	}
+	// mock
+	createMock(t)
 
-// 	// SUT + act
-// 	handleAction(
-// 		dummySession,
-// 		dummyAction,
-// 	)
+	// expect
+	initiateSessionFuncExpected = 1
+	initiateSessionFunc = func(app *application, index int) *session {
+		initiateSessionFuncCalled++
+		assert.Equal(t, dummyApplication, app)
+		assert.Equal(t, dummyIndex, index)
+		return dummySession
+	}
+	logProcessEnterFuncExpected = 1
+	logProcessEnterFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
+		logProcessEnterFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyName, category)
+		assert.Equal(t, "", subcategory)
+		assert.Equal(t, "", messageFormat)
+		assert.Empty(t, parameters)
+	}
+	logProcessRequestFuncExpected = 1
+	logProcessRequestFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
+		logProcessRequestFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyName, category)
+		assert.Equal(t, "InstanceIndex", subcategory)
+		assert.Equal(t, "%v", messageFormat)
+		assert.Equal(t, 1, len(parameters))
+		assert.Equal(t, dummyIndex, parameters[0])
+	}
+	getTimeNowUTCFuncExpected = 1
+	getTimeNowUTCFunc = func() time.Time {
+		getTimeNowUTCFuncCalled++
+		return dummyTimeNow
+	}
+	processSessionFuncExpected = 1
+	processSessionFunc = func(session Session, customization Customization) error {
+		processSessionFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyCustomization, customization)
+		return dummyProcessError
+	}
+	finalizeSessionFuncExpected = 1
+	finalizeSessionFunc = func(session *session, resultError error) error {
+		finalizeSessionFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyProcessError, resultError)
+		return dummyFinalError
+	}
+	timeSinceExpected = 1
+	timeSince = func(tm time.Time) time.Duration {
+		timeSinceCalled++
+		assert.Equal(t, dummyTimeNow, tm)
+		return dummyDuration
+	}
+	logProcessResponseFuncExpected = 1
+	logProcessResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
+		logProcessResponseFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyName, category)
+		assert.Equal(t, "", subcategory)
+		assert.Equal(t, "%v", messageFormat)
+		assert.Equal(t, 1, len(parameters))
+		assert.Equal(t, dummyFinalError, parameters[0])
+	}
+	logProcessExitFuncExpected = 1
+	logProcessExitFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
+		logProcessExitFuncCalled++
+		assert.Equal(t, dummySession, session)
+		assert.Equal(t, dummyName, category)
+		assert.Equal(t, "Duration", subcategory)
+		assert.Equal(t, "%s", messageFormat)
+		assert.Equal(t, 1, len(parameters))
+		assert.Equal(t, dummyDuration, parameters[0])
+	}
 
-// 	// verify
-// 	verifyAll(t)
-// 	assert.Equal(t, customizationPreActionExpected, customizationPreActionCalled, "Unexpected number of calls to method customization.PreAction")
-// 	assert.Equal(t, dummyActionExpected, dummyActionCalled, "Unexpected number of calls to method dummyAction")
-// 	assert.Equal(t, customizationPostActionExpected, customizationPostActionCalled, "Unexpected number of calls to method customization.PostAction")
-// }
+	// SUT + act
+	var err = handleSession(
+		dummyApplication,
+		dummyIndex,
+	)
 
-// func TestHandleSession_RouteError(t *testing.T) {
-// 	// arrange
-// 	var dummyResponseWriter = &dummyResponseWriter{t: t}
-// 	var dummyMethod = "some method"
-// 	var dummyHTTPRequest = &http.Request{
-// 		Method: dummyMethod,
-// 	}
-// 	var dummyName = "some name"
-// 	var dummySession = &session{
-// 		name: dummyName,
-// 	}
-// 	var dummyAction = func(session Session) (interface{}, error) { return nil, nil }
-// 	var dummyRouteError = errors.New("some route error")
-// 	var dummyStartTime = time.Now()
+	// assert
+	assert.Equal(t, dummyFinalError, err)
 
-// 	// mock
-// 	createMock(t)
-
-// 	// expect
-// 	initiateSessionFuncExpected = 1
-// 	initiateSessionFunc = func(responseWriter http.ResponseWriter, httpRequest *http.Request) (*session, ActionFunc, error) {
-// 		initiateSessionFuncCalled++
-// 		assert.Equal(t, dummyResponseWriter, responseWriter)
-// 		assert.Equal(t, dummyHTTPRequest, httpRequest)
-// 		return dummySession, dummyAction, dummyRouteError
-// 	}
-// 	logEndpointEnterFuncExpected = 1
-// 	logEndpointEnterFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-// 		logEndpointEnterFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyName, category)
-// 		assert.Equal(t, dummyMethod, subcategory)
-// 		assert.Zero(t, messageFormat)
-// 		assert.Empty(t, parameters)
-// 	}
-// 	getTimeNowUTCFuncExpected = 1
-// 	getTimeNowUTCFunc = func() time.Time {
-// 		getTimeNowUTCFuncCalled++
-// 		return dummyStartTime
-// 	}
-// 	finalizeSessionFuncExpected = 1
-// 	finalizeSessionFunc = func(session *session, startTime time.Time) {
-// 		finalizeSessionFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyStartTime, startTime)
-// 	}
-// 	writeResponseFuncExpected = 1
-// 	writeResponseFunc = func(session *session, responseObject interface{}, responseError error) {
-// 		writeResponseFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Nil(t, responseObject)
-// 		assert.Equal(t, dummyRouteError, responseError)
-// 	}
-
-// 	// SUT + act
-// 	handleSession(
-// 		dummyResponseWriter,
-// 		dummyHTTPRequest,
-// 	)
-
-// 	// verify
-// 	verifyAll(t)
-// }
-
-// func TestHandleSession_Success(t *testing.T) {
-// 	// arrange
-// 	var dummyResponseWriter = &dummyResponseWriter{t: t}
-// 	var dummyMethod = "some method"
-// 	var dummyHTTPRequest = &http.Request{
-// 		Method: dummyMethod,
-// 	}
-// 	var dummyName = "some name"
-// 	var dummySession = &session{
-// 		name: dummyName,
-// 	}
-// 	var dummyAction = func(session Session) (interface{}, error) { return nil, nil }
-// 	var dummyStartTime = time.Now()
-
-// 	// mock
-// 	createMock(t)
-
-// 	// expect
-// 	initiateSessionFuncExpected = 1
-// 	initiateSessionFunc = func(responseWriter http.ResponseWriter, httpRequest *http.Request) (*session, ActionFunc, error) {
-// 		initiateSessionFuncCalled++
-// 		assert.Equal(t, dummyResponseWriter, responseWriter)
-// 		assert.Equal(t, dummyHTTPRequest, httpRequest)
-// 		return dummySession, dummyAction, nil
-// 	}
-// 	logEndpointEnterFuncExpected = 1
-// 	logEndpointEnterFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-// 		logEndpointEnterFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyName, category)
-// 		assert.Equal(t, dummyMethod, subcategory)
-// 		assert.Zero(t, messageFormat)
-// 		assert.Empty(t, parameters)
-// 	}
-// 	getTimeNowUTCFuncExpected = 1
-// 	getTimeNowUTCFunc = func() time.Time {
-// 		getTimeNowUTCFuncCalled++
-// 		return dummyStartTime
-// 	}
-// 	finalizeSessionFuncExpected = 1
-// 	finalizeSessionFunc = func(session *session, startTime time.Time) {
-// 		finalizeSessionFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		assert.Equal(t, dummyStartTime, startTime)
-// 	}
-// 	handleActionFuncExpected = 1
-// 	handleActionFunc = func(session *session, action ActionFunc) {
-// 		handleActionFuncCalled++
-// 		assert.Equal(t, dummySession, session)
-// 		functionPointerEquals(t, dummyAction, action)
-// 	}
-
-// 	// SUT + act
-// 	handleSession(
-// 		dummyResponseWriter,
-// 		dummyHTTPRequest,
-// 	)
-
-// 	// verify
-// 	verifyAll(t)
-// }
+	// verify
+	verifyAll(t)
+}

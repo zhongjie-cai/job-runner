@@ -41,6 +41,16 @@ var (
 	beginApplicationFuncCalled             int
 	logAppRootFuncExpected                 int
 	logAppRootFuncCalled                   int
+	handleSessionFuncExpected              int
+	handleSessionFuncCalled                int
+	runInstancesFuncExpected               int
+	runInstancesFuncCalled                 int
+	repeatExecutionFuncExpected            int
+	repeatExecutionFuncCalled              int
+	timeAfterExpected                      int
+	timeAfterCalled                        int
+	runApplicationFuncExpected             int
+	runApplicationFuncCalled               int
 	initializeHTTPClientsFuncExpected      int
 	initializeHTTPClientsFuncCalled        int
 	fmtPrintfExpected                      int
@@ -111,6 +121,8 @@ var (
 	logProcessResponseFuncCalled           int
 	logProcessRequestFuncExpected          int
 	logProcessRequestFuncCalled            int
+	processSessionFuncExpected             int
+	processSessionFuncCalled               int
 	httpStatusTextExpected                 int
 	httpStatusTextCalled                   int
 	strconvItoaExpected                    int
@@ -220,6 +232,33 @@ func createMock(t *testing.T) {
 	logAppRootFuncCalled = 0
 	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
 		logAppRootFuncCalled++
+	}
+	handleSessionFuncExpected = 0
+	handleSessionFuncCalled = 0
+	handleSessionFunc = func(app *application, index int) error {
+		handleSessionFuncCalled++
+		return nil
+	}
+	runInstancesFuncExpected = 0
+	runInstancesFuncCalled = 0
+	runInstancesFunc = func(app *application) {
+		runInstancesFuncCalled++
+	}
+	repeatExecutionFuncExpected = 0
+	repeatExecutionFuncCalled = 0
+	repeatExecutionFunc = func(app *application) {
+		repeatExecutionFuncCalled++
+	}
+	timeAfterExpected = 0
+	timeAfterCalled = 0
+	timeAfter = func(d time.Duration) <-chan time.Time {
+		timeAfterCalled++
+		return nil
+	}
+	runApplicationFuncExpected = 0
+	runApplicationFuncCalled = 0
+	runApplicationFunc = func(app *application) {
+		runApplicationFuncCalled++
 	}
 	initializeHTTPClientsFuncExpected = 0
 	initializeHTTPClientsFuncCalled = 0
@@ -418,6 +457,12 @@ func createMock(t *testing.T) {
 	logProcessRequestFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
 		logProcessRequestFuncCalled++
 	}
+	processSessionFuncExpected = 0
+	processSessionFuncCalled = 0
+	processSessionFunc = func(session Session, customization Customization) error {
+		processSessionFuncCalled++
+		return nil
+	}
 	httpStatusTextExpected = 0
 	httpStatusTextCalled = 0
 	httpStatusText = func(code int) string {
@@ -601,6 +646,16 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, beginApplicationFuncExpected, beginApplicationFuncCalled, "Unexpected number of calls to method beginApplicationFunc")
 	logAppRootFunc = logAppRoot
 	assert.Equal(t, logAppRootFuncExpected, logAppRootFuncCalled, "Unexpected number of calls to method logAppRootFunc")
+	handleSessionFunc = handleSession
+	assert.Equal(t, handleSessionFuncExpected, handleSessionFuncCalled, "Unexpected number of calls to method handleSessionFunc")
+	runInstancesFunc = runInstances
+	assert.Equal(t, runInstancesFuncExpected, runInstancesFuncCalled, "Unexpected number of calls to method runInstancesFunc")
+	repeatExecutionFunc = repeatExecution
+	assert.Equal(t, repeatExecutionFuncExpected, repeatExecutionFuncCalled, "Unexpected number of calls to method repeatExecutionFunc")
+	timeAfter = time.After
+	assert.Equal(t, timeAfterExpected, timeAfterCalled, "Unexpected number of calls to method timeAfter")
+	runApplicationFunc = runApplication
+	assert.Equal(t, runApplicationFuncExpected, runApplicationFuncCalled, "Unexpected number of calls to method runApplicationFunc")
 	initializeHTTPClientsFunc = initializeHTTPClients
 	assert.Equal(t, initializeHTTPClientsFuncExpected, initializeHTTPClientsFuncCalled, "Unexpected number of calls to method initializeHTTPClientsFunc")
 	fmtPrintf = fmt.Printf
@@ -669,6 +724,8 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, logProcessResponseFuncExpected, logProcessResponseFuncCalled, "Unexpected number of calls to method logProcessResponseFunc")
 	logProcessRequestFunc = logProcessRequest
 	assert.Equal(t, logProcessRequestFuncExpected, logProcessRequestFuncCalled, "Unexpected number of calls to method logProcessRequestFunc")
+	processSessionFunc = processSession
+	assert.Equal(t, processSessionFuncExpected, processSessionFuncCalled, "Unexpected number of calls to method processSessionFunc")
 	httpStatusText = http.StatusText
 	assert.Equal(t, httpStatusTextExpected, httpStatusTextCalled, "Unexpected number of calls to method httpStatusText")
 	strconvItoa = strconv.Itoa

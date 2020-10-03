@@ -32,10 +32,10 @@ type BootstrapCustomization interface {
 
 // HandlerCustomization holds customization methods related to handlers
 type HandlerCustomization interface {
-	// PreAction is to customize the pre-action used before each route action takes place, e.g. authorization, etc.
+	// PreAction is to customize the pre-action used before each job action takes place, e.g. authorization, etc.
 	PreAction(session Session) error
 
-	// PostAction is to customize the post-action used after each route action takes place, e.g. finalization, etc.
+	// PostAction is to customize the post-action used after each job action takes place successfully, e.g. finalization, etc.
 	PostAction(session Session) error
 
 	// ActionFunc is to customize the action function to be executed when the application starts
@@ -91,12 +91,12 @@ func (customization *DefaultCustomization) AppClosing() error {
 	return nil
 }
 
-// PreAction is to customize the pre-action used before each route action takes place, e.g. authorization, etc.
+// PreAction is to customize the pre-action used before each job action takes place, e.g. authorization, etc.
 func (customization *DefaultCustomization) PreAction(session Session) error {
 	return nil
 }
 
-// PostAction is to customize the post-action used after each route action takes place, e.g. finalization, etc.
+// PostAction is to customize the post-action used after each job action takes place successfully, e.g. finalization, etc.
 func (customization *DefaultCustomization) PostAction(session Session) error {
 	return nil
 }
@@ -108,7 +108,7 @@ func (customization *DefaultCustomization) ActionFunc(session Session) error {
 
 // RecoverPanic is to customize the recovery of panic into a valid response and error in case it happens (for recoverable panic only)
 func (customization *DefaultCustomization) RecoverPanic(session Session, recoverResult interface{}) error {
-	if recoverResult == nil {
+	if isInterfaceValueNilFunc(recoverResult) {
 		return nil
 	}
 	var recoverError, ok = recoverResult.(error)
