@@ -122,7 +122,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestStart(t *testing.T) {
+func TestApplication_Start(t *testing.T) {
 	// arrange
 	var dummyApplication = &application{
 		name: "some name",
@@ -145,7 +145,27 @@ func TestStart(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestStop_NotStarted(t *testing.T) {
+func TestApplication_IsRunning(t *testing.T) {
+	// arrange
+	var dummyApplication = &application{
+		name:    "some name",
+		started: rand.Intn(100) > 50,
+	}
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var result = dummyApplication.IsRunning()
+
+	// assert
+	assert.Equal(t, dummyApplication.started, result)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestApplication_Stop_NotStarted(t *testing.T) {
 	// arrange
 	var dummyApplication = &application{
 		name:    "some name",
@@ -162,7 +182,7 @@ func TestStop_NotStarted(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestStop_HasStarted(t *testing.T) {
+func TestApplication_Stop_HasStarted(t *testing.T) {
 	// arrange
 	var dummyShutdown = make(chan bool)
 	var dummyApplication = &application{

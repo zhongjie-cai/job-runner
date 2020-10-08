@@ -9,6 +9,8 @@ import (
 type Application interface {
 	// Start starts the job runner according to given specifications for number of instances (in parallel) and repeat frequency defined in application
 	Start()
+	// IsRunning returns true if the job has been successfully started and is currently running
+	IsRunning() bool
 	// Stop interrupts the job runner hosting, causing the job runner to forcefully shutdown
 	Stop()
 }
@@ -57,6 +59,10 @@ func (app *application) Start() {
 	startApplicationFunc(
 		app,
 	)
+}
+
+func (app *application) IsRunning() bool {
+	return app.started
 }
 
 func (app *application) Stop() {
