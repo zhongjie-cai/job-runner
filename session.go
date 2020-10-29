@@ -57,7 +57,7 @@ type SessionLogging interface {
 // SessionWebcall is a subset of Session interface, containing only webcall related methods
 type SessionWebcall interface {
 	// CreateWebcallRequest generates a webcall request object to the targeted external web service for the given session associated to the session ID
-	CreateWebcallRequest(method string, url string, payload string, header map[string]string, sendClientCert bool) WebRequest
+	CreateWebcallRequest(method string, url string, payload string, sendClientCert bool) WebRequest
 }
 
 type session struct {
@@ -214,7 +214,6 @@ func (session *session) CreateWebcallRequest(
 	method string,
 	url string,
 	payload string,
-	header map[string]string,
 	sendClientCert bool,
 ) WebRequest {
 	return &webRequest{
@@ -222,7 +221,8 @@ func (session *session) CreateWebcallRequest(
 		method,
 		url,
 		payload,
-		header,
+		map[string][]string{},
+		map[string][]string{},
 		0,
 		nil,
 		sendClientCert,
