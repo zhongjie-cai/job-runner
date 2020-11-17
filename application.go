@@ -11,6 +11,8 @@ type Application interface {
 	Start()
 	// IsRunning returns true if the job has been successfully started and is currently running
 	IsRunning() bool
+	// LastErrors returns the list of errors occurred during the execution of job instances up until now
+	LastErrors() []error
 	// Stop interrupts the job runner hosting, causing the job runner to forcefully shutdown
 	Stop()
 }
@@ -24,6 +26,7 @@ type application struct {
 	customization Customization
 	shutdown      chan bool
 	started       bool
+	lastErrors    []error
 }
 
 // NewApplication creates a new application for job runner hosting
@@ -51,6 +54,7 @@ func NewApplication(
 		customization,
 		make(chan bool),
 		false,
+		[]error{},
 	}
 	return application
 }
@@ -63,6 +67,10 @@ func (app *application) Start() {
 
 func (app *application) IsRunning() bool {
 	return app.started
+}
+
+func (app *application) LastErrors() []error {
+	return app.lastErrors
 }
 
 func (app *application) Stop() {
@@ -95,6 +103,10 @@ func preBootstraping(app *application) bool {
 			"application",
 			"preBootstraping",
 			"Failed to execute customization.PreBootstrap. Error: %+v",
+			preBootstrapError,
+		)
+		app.lastErrors = append(
+			app.lastErrors,
 			preBootstrapError,
 		)
 		return false
@@ -133,6 +145,10 @@ func postBootstraping(app *application) bool {
 			"Failed to execute customization.PostBootstrap. Error: %+v",
 			postBootstrapError,
 		)
+		app.lastErrors = append(
+			app.lastErrors,
+			postBootstrapError,
+		)
 		return false
 	}
 	logAppRootFunc(
@@ -149,10 +165,16 @@ func runInstances(app *application) {
 	for id := 0; id < app.instances; id++ {
 		waitGroup.Add(1)
 		go func(index int) {
-			handleSessionFunc(
+			var sessionError = handleSessionFunc(
 				app,
 				index,
 			)
+			if sessionError != nil {
+				app.lastErrors = append(
+					app.lastErrors,
+					sessionError,
+				)
+			}
 			waitGroup.Done()
 		}(id)
 	}
@@ -215,6 +237,10 @@ func endApplication(app *application) {
 			"application",
 			"endApplication",
 			"Failed to execute customization.AppClosing. Error: %+v",
+			appClosingError,
+		)
+		app.lastErrors = append(
+			app.lastErrors,
 			appClosingError,
 		)
 	} else {

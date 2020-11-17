@@ -165,6 +165,31 @@ func TestApplication_IsRunning(t *testing.T) {
 	verifyAll(t)
 }
 
+func TestApplication_LastErrors(t *testing.T) {
+	// arrange
+	var dummyLastErrors = []error{
+		errors.New("some error 1"),
+		errors.New("some error 2"),
+		errors.New("some error 3"),
+	}
+	var dummyApplication = &application{
+		name:       "some name",
+		lastErrors: dummyLastErrors,
+	}
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var result = dummyApplication.LastErrors()
+
+	// assert
+	assert.Equal(t, dummyApplication.lastErrors, result)
+
+	// verify
+	verifyAll(t)
+}
+
 func TestApplication_Stop_NotStarted(t *testing.T) {
 	// arrange
 	var dummyApplication = &application{
@@ -382,6 +407,8 @@ func TestPreBootstraping_Error(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
+	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
 
 	// verify
 	verifyAll(t)
@@ -430,6 +457,7 @@ func TestPreBootstraping_Success(t *testing.T) {
 
 	// assert
 	assert.True(t, result)
+	assert.Empty(t, dummyApplication.lastErrors)
 
 	// verify
 	verifyAll(t)
@@ -615,6 +643,8 @@ func TestPostBootstraping_Error(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
+	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
 
 	// verify
 	verifyAll(t)
@@ -663,6 +693,7 @@ func TestPostBootstraping_Success(t *testing.T) {
 
 	// assert
 	assert.True(t, result)
+	assert.Empty(t, dummyApplication.lastErrors)
 
 	// verify
 	verifyAll(t)
@@ -690,6 +721,7 @@ func TestRunInstances_SingleInstance(t *testing.T) {
 	var dummyApplication = &application{
 		instances: 1,
 	}
+	var dummyError = errors.New("some error")
 
 	// mock
 	createMock(t)
@@ -700,35 +732,7 @@ func TestRunInstances_SingleInstance(t *testing.T) {
 		handleSessionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 		assert.Equal(t, 0, index)
-		return errors.New("some ignored error")
-	}
-
-	// SUT + act
-	runInstances(
-		dummyApplication,
-	)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestRunInstances_MultipleInstances(t *testing.T) {
-	// arrange
-	var dummyApplication = &application{
-		instances: 3,
-	}
-	var expectedIndex = map[int]bool{}
-
-	// mock
-	createMock(t)
-
-	// expect
-	handleSessionFuncExpected = 3
-	handleSessionFunc = func(app *application, index int) error {
-		handleSessionFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		expectedIndex[index] = true
-		return errors.New("some ignored error")
+		return dummyError
 	}
 
 	// SUT + act
@@ -737,10 +741,49 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	)
 
 	// assert
-	assert.Equal(t, 3, len(expectedIndex))
+	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
+
+	// verify
+	verifyAll(t)
+}
+
+func TestRunInstances_MultipleInstances(t *testing.T) {
+	// arrange
+	var dummyErrors = []error{
+		errors.New("some error 1"),
+		errors.New("some error 2"),
+		errors.New("some error 3"),
+	}
+	var dummyApplication = &application{
+		instances: len(dummyErrors),
+	}
+	var expectedIndex = map[int]bool{}
+
+	// mock
+	createMock(t)
+
+	// expect
+	handleSessionFuncExpected = dummyApplication.instances
+	handleSessionFunc = func(app *application, index int) error {
+		handleSessionFuncCalled++
+		assert.Equal(t, dummyApplication, app)
+		expectedIndex[index] = true
+		return dummyErrors[index]
+	}
+
+	// SUT + act
+	runInstances(
+		dummyApplication,
+	)
+
+	// assert
+	assert.Equal(t, dummyApplication.instances, len(expectedIndex))
 	assert.True(t, expectedIndex[0])
 	assert.True(t, expectedIndex[1])
 	assert.True(t, expectedIndex[2])
+	assert.Equal(t, dummyApplication.instances, len(dummyApplication.lastErrors))
+	assert.ElementsMatch(t, dummyErrors, dummyApplication.lastErrors)
 
 	// verify
 	verifyAll(t)
@@ -955,6 +998,10 @@ func TestEndApplication_Error(t *testing.T) {
 		dummyApplication,
 	)
 
+	// assert
+	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
+
 	// verify
 	verifyAll(t)
 	assert.Equal(t, customizationAppClosingExpected, customizationAppClosingCalled, "Unexpected number of calls to method customization.AppClosing")
@@ -999,6 +1046,9 @@ func TestEndApplication_Success(t *testing.T) {
 	endApplication(
 		dummyApplication,
 	)
+
+	// assert
+	assert.Empty(t, dummyApplication.lastErrors)
 
 	// verify
 	verifyAll(t)
