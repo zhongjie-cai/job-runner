@@ -18,6 +18,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	var dummyVersion = "some version"
 	var dummyInstances = rand.Int()
 	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization Customization
 	var dummySessionID = uuid.New()
 
@@ -43,6 +44,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 		dummyVersion,
 		dummyInstances,
 		&dummyRepeat,
+		dummyOverlap,
 		dummyCustomization,
 	)
 
@@ -56,6 +58,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	assert.Equal(t, dummyVersion, value.version)
 	assert.Equal(t, dummyInstances, value.instances)
 	assert.Equal(t, &dummyRepeat, value.repeat)
+	assert.Equal(t, dummyOverlap, value.overlap)
 	assert.NotNil(t, value.session)
 	assert.Equal(t, dummySessionID, value.session.id)
 	assert.Equal(t, 0, value.session.index)
@@ -73,6 +76,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	var dummyVersion = "some version"
 	var dummyInstances = rand.Int()
 	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization = &dummyCustomization{t: t}
 	var dummySessionID = uuid.New()
 
@@ -98,6 +102,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 		dummyVersion,
 		dummyInstances,
 		&dummyRepeat,
+		dummyOverlap,
 		dummyCustomization,
 	)
 
@@ -111,6 +116,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	assert.Equal(t, dummyVersion, value.version)
 	assert.Equal(t, dummyInstances, value.instances)
 	assert.Equal(t, &dummyRepeat, value.repeat)
+	assert.Equal(t, dummyOverlap, value.overlap)
 	assert.NotNil(t, value.session)
 	assert.Equal(t, dummySessionID, value.session.id)
 	assert.Equal(t, 0, value.session.index)
@@ -789,7 +795,7 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestRepeatExecution_HappyPath(t *testing.T) {
+func TestRepeatExecution_WithOverlap(t *testing.T) {
 	// arrange
 	var dummyRepeat = time.Duration(rand.Intn(100))
 	var dummyTimeAfter = make(chan time.Time)
@@ -797,6 +803,7 @@ func TestRepeatExecution_HappyPath(t *testing.T) {
 		name:    "some name",
 		repeat:  &dummyRepeat,
 		started: true,
+		overlap: true,
 	}
 
 	// mock
@@ -822,7 +829,46 @@ func TestRepeatExecution_HappyPath(t *testing.T) {
 		dummyApplication,
 	)
 
-	// assert
+	// verify
+	verifyAll(t)
+}
+
+func TestRepeatExecution_NoOverlap(t *testing.T) {
+	// arrange
+	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummyTimeAfter = make(chan time.Time)
+	var dummyApplication = &application{
+		name:    "some name",
+		repeat:  &dummyRepeat,
+		started: true,
+		overlap: false,
+	}
+
+	// mock
+	createMock(t)
+
+	// expect
+	runInstancesFuncExpected = 2
+	runInstancesFunc = func(app *application) {
+		runInstancesFuncCalled++
+		assert.Equal(t, dummyApplication, app)
+		app.started = (runInstancesFuncCalled < runInstancesFuncExpected)
+	}
+	timeAfterExpected = 2
+	timeAfter = func(d time.Duration) <-chan time.Time {
+		timeAfterCalled++
+		assert.Equal(t, dummyRepeat, d)
+		return dummyTimeAfter
+	}
+
+	// SUT + act
+	go repeatExecution(
+		dummyApplication,
+	)
+
+	// push
+	dummyTimeAfter <- time.Now()
+	dummyTimeAfter <- time.Now()
 
 	// verify
 	verifyAll(t)

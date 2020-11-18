@@ -22,6 +22,7 @@ type application struct {
 	version       string
 	instances     int
 	repeat        *time.Duration
+	overlap       bool
 	session       *session
 	customization Customization
 	shutdown      chan bool
@@ -30,11 +31,15 @@ type application struct {
 }
 
 // NewApplication creates a new application for job runner hosting
+//   instances marks how many action functions to be executed in parallel at once
+//   repeat marks how often the action functions should be repeated until stop signal is given
+//   overlap marks whether allow overlapping when a previous execution is taking longer than repeat duration
 func NewApplication(
 	name string,
 	version string,
 	instances int,
 	repeat *time.Duration,
+	overlap bool,
 	customization Customization,
 ) Application {
 	if isInterfaceValueNilFunc(customization) {
@@ -45,6 +50,7 @@ func NewApplication(
 		version,
 		instances,
 		repeat,
+		overlap,
 		&session{
 			uuidNew(),
 			0,
@@ -183,9 +189,15 @@ func runInstances(app *application) {
 
 func repeatExecution(app *application) {
 	for {
-		go runInstancesFunc(
-			app,
-		)
+		if app.overlap {
+			go runInstancesFunc(
+				app,
+			)
+		} else {
+			runInstancesFunc(
+				app,
+			)
+		}
 		<-timeAfter(
 			*app.repeat,
 		)
