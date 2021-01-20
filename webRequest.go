@@ -112,6 +112,8 @@ type WebRequest interface {
 	EnableRetry(connectivityRetryCount int, httpStatusRetryCount map[int]int, retryDuration time.Duration)
 	// Process sends the webcall request over the wire, retrieves and serialize the response to dataTemplate, and provides status code, header and error if applicable
 	Process(dataTemplate interface{}) (statusCode int, responseHeader http.Header, responseError error)
+	// Process sends the webcall request over the wire, retrieves and serialize the response to dataTemplateMap according to HTTP status code as entry, and provides status code, header and error if applicable
+	ProcessAny(dataTemplateMap map[int]interface{}) (statusCode int, responseHeader http.Header, responseError error)
 	// ProcessRaw sends the webcall request over the wire, retrieves the response, and returns that response and error if applicable
 	ProcessRaw() (responseObject *http.Response, responseError error)
 }
@@ -410,6 +412,37 @@ func (webRequest *webRequest) Process(dataTemplate interface{}) (statusCode int,
 			webRequest.session,
 			responseObject.Body,
 			dataTemplate,
+		)
+	}
+	return responseObject.StatusCode,
+		responseObject.Header,
+		responseError
+}
+
+// Process sends the webcall request over the wire, retrieves and serialize the response to dataTemplateMap according to HTTP status code as entry, and provides status code, header and error if applicable
+func (webRequest *webRequest) ProcessAny(dataTemplateMap map[int]interface{}) (statusCode int, responseHeader http.Header, responseError error) {
+	if webRequest == nil ||
+		webRequest.session == nil {
+		return 0, nil, fmtErrorf("WebRequest is nil or contains invalid session")
+	}
+	var responseObject *http.Response
+	responseObject, responseError = doRequestProcessingFunc(
+		webRequest,
+	)
+	if responseError != nil {
+		if responseObject == nil {
+			return http.StatusInternalServerError,
+				make(http.Header),
+				responseError
+		}
+	} else {
+		if responseObject == nil {
+			return 0, make(http.Header), nil
+		}
+		responseError = parseResponseFunc(
+			webRequest.session,
+			responseObject.Body,
+			dataTemplateMap[responseObject.StatusCode],
 		)
 	}
 	return responseObject.StatusCode,
