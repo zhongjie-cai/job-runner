@@ -227,5 +227,6 @@ func (session *session) CreateWebcallRequest(
 		nil,
 		sendClientCert,
 		0,
+		[]dataReceiver{},
 	}
 }

@@ -141,5 +141,6 @@ var (
 	ioutilNopCloser         = ioutil.NopCloser
 	bytesNewBuffer          = bytes.NewBuffer
 	httpStatusText          = http.StatusText
+	getDataTemplateFunc     = getDataTemplate
 	parseResponseFunc       = parseResponse
 )

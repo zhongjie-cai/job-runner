@@ -513,7 +513,7 @@ func TestInitializeHTTPClients(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestWebREquestAddQuery_HappyPath(t *testing.T) {
+func TestWebRequestAddQuery_HappyPath(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyValue1 = "some value 1"
@@ -527,23 +527,22 @@ func TestWebREquestAddQuery_HappyPath(t *testing.T) {
 	var sut = &webRequest{}
 
 	// act
-	sut.AddQuery(
+	var result, ok = sut.AddQuery(
 		dummyName,
 		dummyValue1,
-	)
-	sut.AddQuery(
+	).AddQuery(
 		dummyName,
 		dummyValue2,
-	)
-	sut.AddQuery(
+	).AddQuery(
 		dummyName,
 		dummyValue3,
-	)
+	).(*webRequest)
 
 	// assert
-	assert.NotNil(t, sut.query)
-	assert.Equal(t, 1, len(sut.query))
-	var values, found = sut.query[dummyName]
+	assert.True(t, ok)
+	assert.NotNil(t, result.query)
+	assert.Equal(t, 1, len(result.query))
+	var values, found = result.query[dummyName]
 	assert.True(t, found)
 	assert.Equal(t, 3, len(values))
 	assert.Equal(t, dummyValue1, values[0])
@@ -554,7 +553,7 @@ func TestWebREquestAddQuery_HappyPath(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestWebREquestAddHeader_HappyPath(t *testing.T) {
+func TestWebRequestAddHeader_HappyPath(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyValue1 = "some value 1"
@@ -568,23 +567,22 @@ func TestWebREquestAddHeader_HappyPath(t *testing.T) {
 	var sut = &webRequest{}
 
 	// act
-	sut.AddHeader(
+	var result, ok = sut.AddHeader(
 		dummyName,
 		dummyValue1,
-	)
-	sut.AddHeader(
+	).AddHeader(
 		dummyName,
 		dummyValue2,
-	)
-	sut.AddHeader(
+	).AddHeader(
 		dummyName,
 		dummyValue3,
-	)
+	).(*webRequest)
 
 	// assert
-	assert.NotNil(t, sut.header)
-	assert.Equal(t, 1, len(sut.header))
-	var values, found = sut.header[dummyName]
+	assert.True(t, ok)
+	assert.NotNil(t, result.header)
+	assert.Equal(t, 1, len(result.header))
+	var values, found = result.header[dummyName]
 	assert.True(t, found)
 	assert.Equal(t, 3, len(values))
 	assert.Equal(t, dummyValue1, values[0])
@@ -595,7 +593,7 @@ func TestWebREquestAddHeader_HappyPath(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestWebRequestEnableRetry(t *testing.T) {
+func TestWebRequestSetupRetry(t *testing.T) {
 	// arrange
 	var dummyConnRetry = rand.Int()
 	var dummyHTTPRetry = map[int]int{
@@ -611,16 +609,57 @@ func TestWebRequestEnableRetry(t *testing.T) {
 	createMock(t)
 
 	// act
-	sut.EnableRetry(
+	var result, ok = sut.SetupRetry(
 		dummyConnRetry,
 		dummyHTTPRetry,
 		dummyRetryDelay,
-	)
+	).(*webRequest)
 
 	// assert
-	assert.Equal(t, dummyConnRetry, sut.connRetry)
-	assert.Equal(t, dummyHTTPRetry, sut.httpRetry)
-	assert.Equal(t, dummyRetryDelay, sut.retryDelay)
+	assert.True(t, ok)
+	assert.Equal(t, dummyConnRetry, result.connRetry)
+	assert.Equal(t, dummyHTTPRetry, result.httpRetry)
+	assert.Equal(t, dummyRetryDelay, result.retryDelay)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestWebRequestAnticipate(t *testing.T) {
+	// arrange
+	var dummyBeginStatusCode1 = rand.Int()
+	var dummyEndStatusCode1 = rand.Int()
+	var dummyDataTemplate1 string
+	var dummyBeginStatusCode2 = rand.Int()
+	var dummyEndStatusCode2 = rand.Int()
+	var dummyDataTemplate2 int
+
+	// SUT
+	var sut = &webRequest{}
+
+	// mock
+	createMock(t)
+
+	// act
+	var result, ok = sut.Anticipate(
+		dummyBeginStatusCode1,
+		dummyEndStatusCode1,
+		&dummyDataTemplate1,
+	).Anticipate(
+		dummyBeginStatusCode2,
+		dummyEndStatusCode2,
+		&dummyDataTemplate2,
+	).(*webRequest)
+
+	// assert
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(result.dataReceivers))
+	assert.Equal(t, dummyBeginStatusCode1, result.dataReceivers[0].beginStatusCode)
+	assert.Equal(t, dummyEndStatusCode1, result.dataReceivers[0].endStatusCode)
+	assert.Equal(t, &dummyDataTemplate1, result.dataReceivers[0].dataTemplate)
+	assert.Equal(t, dummyBeginStatusCode2, result.dataReceivers[1].beginStatusCode)
+	assert.Equal(t, dummyEndStatusCode2, result.dataReceivers[1].endStatusCode)
+	assert.Equal(t, &dummyDataTemplate2, result.dataReceivers[1].dataTemplate)
 
 	// verify
 	verifyAll(t)
@@ -998,6 +1037,9 @@ func TestCreateHTTPRequest_RequestError(t *testing.T) {
 	}
 	var dummySendClientCert = rand.Intn(100) < 50
 	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyDataReceivers = []dataReceiver{
+		{0, 999, nil},
+	}
 	var dummyWebRequest = &webRequest{
 		dummySession,
 		dummyMethod,
@@ -1009,6 +1051,7 @@ func TestCreateHTTPRequest_RequestError(t *testing.T) {
 		dummyHTTPRetry,
 		dummySendClientCert,
 		dummyRetryDelay,
+		dummyDataReceivers,
 	}
 	var dummyRequestURL = "some request url"
 	var dummyRequest *http.Request
@@ -1078,6 +1121,9 @@ func TestCreateHTTPRequest_Success(t *testing.T) {
 	}
 	var dummySendClientCert = rand.Intn(100) < 50
 	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyDataReceivers = []dataReceiver{
+		{0, 999, nil},
+	}
 	var dummyWebRequest = &webRequest{
 		dummySession,
 		dummyMethod,
@@ -1089,6 +1135,7 @@ func TestCreateHTTPRequest_Success(t *testing.T) {
 		dummyHTTPRetry,
 		dummySendClientCert,
 		dummyRetryDelay,
+		dummyDataReceivers,
 	}
 	var dummyRequestURL = "some request url"
 	var dummyRequest = &http.Request{
@@ -1594,63 +1641,118 @@ func TestDoRequestProcessing_ResponseSuccess(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestWebRequestProcessRaw_HappyPath(t *testing.T) {
+func TestGetDataTemplate_EmptyDataReceivers(t *testing.T) {
 	// arrange
-	var dummyResponseObject = &http.Response{}
-	var dummyResponseError = errors.New("some error")
-
-	// SUT
-	var sut = &webRequest{}
+	var dummyStatusCode = rand.Intn(100)
+	var dummyDataReceivers = []dataReceiver{}
 
 	// mock
 	createMock(t)
 
-	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-
-	// act
-	var result, err = sut.ProcessRaw()
+	// SUT + act
+	var result = getDataTemplate(
+		dummyStatusCode,
+		dummyDataReceivers,
+	)
 
 	// assert
-	assert.Equal(t, dummyResponseObject, result)
-	assert.Equal(t, dummyResponseError, err)
+	assert.Nil(t, result)
 
 	// verify
 	verifyAll(t)
 }
 
-func TestParseResponse_NilPointer(t *testing.T) {
+func TestGetDataTemplate_NoMatch(t *testing.T) {
 	// arrange
-	var dummySession = &session{id: uuid.New()}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyStatusCode = rand.Intn(100)
 	var dummyDataTemplate string
+	var dummyDataReceivers = []dataReceiver{
+		{
+			beginStatusCode: rand.Intn(100) + 100,
+			endStatusCode:   rand.Intn(100) + 200,
+			dataTemplate:    &dummyDataTemplate,
+		},
+	}
 
 	// mock
 	createMock(t)
 
-	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate, i)
-		return true
-	}
-
 	// SUT + act
-	var err = parseResponse(
-		dummySession,
-		dummyBody,
-		&dummyDataTemplate,
+	var result = getDataTemplate(
+		dummyStatusCode,
+		dummyDataReceivers,
 	)
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
-	assert.NoError(t, err)
+	assert.Nil(t, result)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestGetDataTemplate_SingleMatch(t *testing.T) {
+	// arrange
+	var dummyStatusCode = rand.Intn(100)
+	var dummyDataTemplate1 string
+	var dummyDataTemplate2 int
+	var dummyDataReceivers = []dataReceiver{
+		{
+			beginStatusCode: dummyStatusCode - rand.Intn(10),
+			endStatusCode:   dummyStatusCode + rand.Intn(10),
+			dataTemplate:    &dummyDataTemplate1,
+		},
+		{
+			beginStatusCode: rand.Intn(100) + 100,
+			endStatusCode:   rand.Intn(100) + 200,
+			dataTemplate:    &dummyDataTemplate2,
+		},
+	}
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var result = getDataTemplate(
+		dummyStatusCode,
+		dummyDataReceivers,
+	)
+
+	// assert
+	assert.Equal(t, &dummyDataTemplate1, result)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestGetDataTemplate_OverlapMatch(t *testing.T) {
+	// arrange
+	var dummyStatusCode = rand.Intn(100)
+	var dummyDataTemplate1 string
+	var dummyDataTemplate2 int
+	var dummyDataReceivers = []dataReceiver{
+		{
+			beginStatusCode: dummyStatusCode - rand.Intn(10),
+			endStatusCode:   dummyStatusCode + rand.Intn(10),
+			dataTemplate:    &dummyDataTemplate1,
+		},
+		{
+			beginStatusCode: dummyStatusCode - rand.Intn(10),
+			endStatusCode:   dummyStatusCode + rand.Intn(10),
+			dataTemplate:    &dummyDataTemplate2,
+		},
+	}
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var result = getDataTemplate(
+		dummyStatusCode,
+		dummyDataReceivers,
+	)
+
+	// assert
+	assert.Equal(t, &dummyDataTemplate2, result)
 
 	// verify
 	verifyAll(t)
@@ -1668,12 +1770,6 @@ func TestParseResponse_ReadError(t *testing.T) {
 	createMock(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate, i)
-		return false
-	}
 	ioutilReadAllExpected = 1
 	ioutilReadAll = func(r io.Reader) ([]byte, error) {
 		ioutilReadAllCalled++
@@ -1708,12 +1804,6 @@ func TestParseResponse_JSONError(t *testing.T) {
 	createMock(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate, i)
-		return false
-	}
 	ioutilReadAllExpected = 1
 	ioutilReadAll = func(r io.Reader) ([]byte, error) {
 		ioutilReadAllCalled++
@@ -1764,12 +1854,6 @@ func TestParseResponse_HappyPath(t *testing.T) {
 	createMock(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate, i)
-		return false
-	}
 	ioutilReadAllExpected = 1
 	ioutilReadAll = func(r io.Reader) ([]byte, error) {
 		ioutilReadAllCalled++
@@ -1801,7 +1885,6 @@ func TestParseResponse_HappyPath(t *testing.T) {
 
 func TestWebRequestProcess_NilWebRequest(t *testing.T) {
 	// arrange
-	var dummyDataTemplate string
 	var dummyError = errors.New("some error message")
 
 	// SUT
@@ -1820,12 +1903,9 @@ func TestWebRequestProcess_NilWebRequest(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
 	assert.Zero(t, result)
 	assert.Nil(t, header)
 	assert.Equal(t, dummyError, err)
@@ -1836,7 +1916,6 @@ func TestWebRequestProcess_NilWebRequest(t *testing.T) {
 
 func TestWebRequestProcess_NilWebRequestSession(t *testing.T) {
 	// arrange
-	var dummyDataTemplate string
 	var dummyError = errors.New("some error message")
 
 	// SUT
@@ -1855,12 +1934,9 @@ func TestWebRequestProcess_NilWebRequestSession(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
 	assert.Zero(t, result)
 	assert.Nil(t, header)
 	assert.Equal(t, dummyError, err)
@@ -1873,7 +1949,6 @@ func TestWebRequestProcess_Error_NilObject(t *testing.T) {
 	// arrange
 	var dummyResponseObject *http.Response
 	var dummyResponseError = errors.New("some error")
-	var dummyDataTemplate string
 
 	// SUT
 	var sut = &webRequest{
@@ -1892,12 +1967,9 @@ func TestWebRequestProcess_Error_NilObject(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
 	assert.Equal(t, http.StatusInternalServerError, result)
 	assert.Empty(t, header)
 	assert.Equal(t, dummyResponseError, err)
@@ -1918,7 +1990,6 @@ func TestWebRequestProcess_Error_ValidObject(t *testing.T) {
 		Header:     dummyHeader,
 	}
 	var dummyResponseError = errors.New("some error")
-	var dummyDataTemplate string
 
 	// SUT
 	var sut = &webRequest{
@@ -1937,12 +2008,9 @@ func TestWebRequestProcess_Error_ValidObject(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
 	assert.Equal(t, dummyStatusCode, result)
 	assert.Equal(t, http.Header(dummyHeader), header)
 	assert.Equal(t, dummyResponseError, err)
@@ -1955,7 +2023,6 @@ func TestWebRequestProcess_Success_NilObject(t *testing.T) {
 	// arrange
 	var dummyResponseObject *http.Response
 	var dummyResponseError error
-	var dummyDataTemplate string
 
 	// SUT
 	var sut = &webRequest{
@@ -1974,12 +2041,9 @@ func TestWebRequestProcess_Success_NilObject(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, dummyDataTemplate)
 	assert.Zero(t, result)
 	assert.Empty(t, header)
 	assert.NoError(t, err)
@@ -2006,10 +2070,14 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 	var dummyDataTemplate string
 	var dummyData = "some data"
 	var dummySession = &session{id: uuid.New()}
+	var dummyDataReceivers = []dataReceiver{
+		{0, 999, &dummyDataTemplate},
+	}
 
 	// SUT
 	var sut = &webRequest{
-		session: dummySession,
+		session:       dummySession,
+		dataReceivers: dummyDataReceivers,
 	}
 
 	// mock
@@ -2021,6 +2089,13 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 		doRequestProcessingFuncCalled++
 		assert.Equal(t, sut, webRequest)
 		return dummyResponseObject, dummyResponseError
+	}
+	getDataTemplateFuncExpected = 1
+	getDataTemplateFunc = func(statusCode int, dataReceivers []dataReceiver) interface{} {
+		getDataTemplateFuncCalled++
+		assert.Equal(t, dummyStatusCode, statusCode)
+		assert.Equal(t, dummyDataReceivers, dataReceivers)
+		return &dummyDataTemplate
 	}
 	parseResponseFuncExpected = 1
 	parseResponseFunc = func(session *session, body io.ReadCloser, dataTemplate interface{}) error {
@@ -2032,264 +2107,10 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 	}
 
 	// act
-	var result, header, err = sut.Process(
-		&dummyDataTemplate,
-	)
+	var result, header, err = sut.Process()
 
 	// assert
 	assert.Equal(t, dummyData, dummyDataTemplate)
-	assert.Equal(t, dummyStatusCode, result)
-	assert.Equal(t, http.Header(dummyHeader), header)
-	assert.Equal(t, dummyParseError, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_NilWebRequest(t *testing.T) {
-	// arrange
-	var dummyDataTemplateMap map[int]interface{}
-	var dummyError = errors.New("some error message")
-
-	// SUT
-	var sut *webRequest
-
-	// mock
-	createMock(t)
-
-	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Zero(t, dummyDataTemplateMap)
-	assert.Zero(t, result)
-	assert.Nil(t, header)
-	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_NilWebRequestSession(t *testing.T) {
-	// arrange
-	var dummyDataTemplateMap map[int]interface{}
-	var dummyError = errors.New("some error message")
-
-	// SUT
-	var sut = &webRequest{}
-
-	// mock
-	createMock(t)
-
-	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Zero(t, dummyDataTemplateMap)
-	assert.Zero(t, result)
-	assert.Nil(t, header)
-	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_Error_NilObject(t *testing.T) {
-	// arrange
-	var dummyResponseObject *http.Response
-	var dummyResponseError = errors.New("some error")
-	var dummyDataTemplateMap map[int]interface{}
-
-	// SUT
-	var sut = &webRequest{
-		session: &session{id: uuid.New()},
-	}
-
-	// mock
-	createMock(t)
-
-	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Empty(t, dummyDataTemplateMap)
-	assert.Equal(t, http.StatusInternalServerError, result)
-	assert.Empty(t, header)
-	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_Error_ValidObject(t *testing.T) {
-	// arrange
-	var dummyStatusCode = rand.Int()
-	var dummyHeader = map[string][]string{
-		"foo":  {"bar"},
-		"test": {"123", "456", "789"},
-	}
-	var dummyResponseObject = &http.Response{
-		StatusCode: dummyStatusCode,
-		Header:     dummyHeader,
-	}
-	var dummyResponseError = errors.New("some error")
-	var dummyDataTemplateMap map[int]interface{}
-
-	// SUT
-	var sut = &webRequest{
-		session: &session{id: uuid.New()},
-	}
-
-	// mock
-	createMock(t)
-
-	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Empty(t, dummyDataTemplateMap)
-	assert.Equal(t, dummyStatusCode, result)
-	assert.Equal(t, http.Header(dummyHeader), header)
-	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_Success_NilObject(t *testing.T) {
-	// arrange
-	var dummyResponseObject *http.Response
-	var dummyResponseError error
-	var dummyDataTemplateMap map[int]interface{}
-
-	// SUT
-	var sut = &webRequest{
-		session: &session{id: uuid.New()},
-	}
-
-	// mock
-	createMock(t)
-
-	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Empty(t, dummyDataTemplateMap)
-	assert.Zero(t, result)
-	assert.Empty(t, header)
-	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestWebRequestProcessAny_Success_ValidObject(t *testing.T) {
-	// arrange
-	var dummyStatusCode = 200 + rand.Intn(100)
-	var dummyHeader = map[string][]string{
-		"foo":  {"bar"},
-		"test": {"123", "456", "789"},
-	}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
-	var dummyResponseObject = &http.Response{
-		StatusCode: dummyStatusCode,
-		Header:     dummyHeader,
-		Body:       dummyBody,
-	}
-	var dummyResponseError error
-	var dummyParseError = errors.New("some parse error")
-	var dummyDataTemplate string
-	var dummyDataTemplateMap = map[int]interface{}{
-		dummyStatusCode:       &dummyDataTemplate,
-		dummyStatusCode + 100: nil,
-	}
-	var dummyData = "some data"
-	var dummySession = &session{id: uuid.New()}
-
-	// SUT
-	var sut = &webRequest{
-		session: dummySession,
-	}
-
-	// mock
-	createMock(t)
-
-	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-	parseResponseFuncExpected = 1
-	parseResponseFunc = func(session *session, body io.ReadCloser, dataTemplate interface{}) error {
-		parseResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyBody, body)
-		(*(dataTemplate).(*string)) = dummyData
-		return dummyParseError
-	}
-
-	// act
-	var result, header, err = sut.ProcessAny(
-		dummyDataTemplateMap,
-	)
-
-	// assert
-	assert.Equal(t, dummyData, dummyDataTemplate)
-	assert.Nil(t, dummyDataTemplateMap[dummyStatusCode+100])
 	assert.Equal(t, dummyStatusCode, result)
 	assert.Equal(t, http.Header(dummyHeader), header)
 	assert.Equal(t, dummyParseError, err)
