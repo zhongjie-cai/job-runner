@@ -324,7 +324,7 @@ func createMock(t *testing.T) {
 	}
 	finalizeSessionFuncExpected = 0
 	finalizeSessionFuncCalled = 0
-	finalizeSessionFunc = func(session *session, resultError error) error {
+	finalizeSessionFunc = func(session *session, resultError error, recoverResult interface{}) error {
 		finalizeSessionFuncCalled++
 		return nil
 	}

@@ -19,10 +19,11 @@ func initiateSession(
 func finalizeSession(
 	session *session,
 	errorResult error,
+	recoverResult interface{},
 ) error {
 	var recoverError = session.customization.RecoverPanic(
 		session,
-		recover(),
+		recoverResult,
 	)
 	if errorResult == nil {
 		return recoverError
@@ -85,6 +86,7 @@ func handleSession(
 		err = finalizeSessionFunc(
 			session,
 			err,
+			recover(),
 		)
 		logProcessResponseFunc(
 			session,

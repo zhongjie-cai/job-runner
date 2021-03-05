@@ -68,6 +68,7 @@ func TestFinalizeSession_NoErrorResult(t *testing.T) {
 		customization: dummyCustomizationRecoverPanic,
 	}
 	var dummyErrorResult error
+	var dummyRecoverResult = errors.New("some recover result")
 	var dummyRecoverError = errors.New("some recover error")
 	var customizationRecoverPanicExpected int
 	var customizationRecoverPanicCalled int
@@ -80,7 +81,7 @@ func TestFinalizeSession_NoErrorResult(t *testing.T) {
 	dummyCustomizationRecoverPanic.recoverPanic = func(session Session, recoverResult interface{}) error {
 		customizationRecoverPanicCalled++
 		assert.Equal(t, dummySession, session)
-		assert.Equal(t, recover(), recoverResult)
+		assert.Equal(t, dummyRecoverResult, recoverResult)
 		return dummyRecoverError
 	}
 
@@ -88,6 +89,7 @@ func TestFinalizeSession_NoErrorResult(t *testing.T) {
 	var err = finalizeSession(
 		dummySession,
 		dummyErrorResult,
+		dummyRecoverResult,
 	)
 
 	// assert
@@ -107,6 +109,7 @@ func TestFinalizeSession_WithErrorResult(t *testing.T) {
 		customization: dummyCustomizationRecoverPanic,
 	}
 	var dummyErrorResult = errors.New("some error result")
+	var dummyRecoverResult = errors.New("some recover result")
 	var dummyRecoverError = errors.New("some recover error")
 	var dummyError = errors.New("some error")
 	var customizationRecoverPanicExpected int
@@ -120,7 +123,7 @@ func TestFinalizeSession_WithErrorResult(t *testing.T) {
 	dummyCustomizationRecoverPanic.recoverPanic = func(session Session, recoverResult interface{}) error {
 		customizationRecoverPanicCalled++
 		assert.Equal(t, dummySession, session)
-		assert.Equal(t, recover(), recoverResult)
+		assert.Equal(t, dummyRecoverResult, recoverResult)
 		return dummyRecoverError
 	}
 	fmtErrorfExpected = 1
@@ -137,6 +140,7 @@ func TestFinalizeSession_WithErrorResult(t *testing.T) {
 	var err = finalizeSession(
 		dummySession,
 		dummyErrorResult,
+		dummyRecoverResult,
 	)
 
 	// assert
@@ -429,10 +433,11 @@ func TestHandleSession_HappyPath(t *testing.T) {
 		return dummyProcessError
 	}
 	finalizeSessionFuncExpected = 1
-	finalizeSessionFunc = func(session *session, resultError error) error {
+	finalizeSessionFunc = func(session *session, resultError error, recoverResult interface{}) error {
 		finalizeSessionFuncCalled++
 		assert.Equal(t, dummySession, session)
 		assert.Equal(t, dummyProcessError, resultError)
+		assert.Equal(t, recover(), recoverResult)
 		return dummyFinalError
 	}
 	timeSinceExpected = 1
