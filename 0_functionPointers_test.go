@@ -46,8 +46,8 @@ var (
 	handleSessionFuncCalled                int
 	runInstancesFuncExpected               int
 	runInstancesFuncCalled                 int
-	repeatExecutionFuncExpected            int
-	repeatExecutionFuncCalled              int
+	scheduleExecutionFuncExpected          int
+	scheduleExecutionFuncCalled            int
 	timeAfterExpected                      int
 	timeAfterCalled                        int
 	runApplicationFuncExpected             int
@@ -253,10 +253,10 @@ func createMock(t *testing.T) {
 	runInstancesFunc = func(app *application) {
 		runInstancesFuncCalled++
 	}
-	repeatExecutionFuncExpected = 0
-	repeatExecutionFuncCalled = 0
-	repeatExecutionFunc = func(app *application) {
-		repeatExecutionFuncCalled++
+	scheduleExecutionFuncExpected = 0
+	scheduleExecutionFuncCalled = 0
+	scheduleExecutionFunc = func(app *application) {
+		scheduleExecutionFuncCalled++
 	}
 	timeAfterExpected = 0
 	timeAfterCalled = 0
@@ -683,8 +683,8 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, handleSessionFuncExpected, handleSessionFuncCalled, "Unexpected number of calls to method handleSessionFunc")
 	runInstancesFunc = runInstances
 	assert.Equal(t, runInstancesFuncExpected, runInstancesFuncCalled, "Unexpected number of calls to method runInstancesFunc")
-	repeatExecutionFunc = repeatExecution
-	assert.Equal(t, repeatExecutionFuncExpected, repeatExecutionFuncCalled, "Unexpected number of calls to method repeatExecutionFunc")
+	scheduleExecutionFunc = scheduleExecution
+	assert.Equal(t, scheduleExecutionFuncExpected, scheduleExecutionFuncCalled, "Unexpected number of calls to method scheduleExecutionFunc")
 	timeAfter = time.After
 	assert.Equal(t, timeAfterExpected, timeAfterCalled, "Unexpected number of calls to method timeAfter")
 	runApplicationFunc = runApplication
@@ -834,18 +834,6 @@ func functionPointerEquals(t *testing.T, expectFunc interface{}, actualFunc inte
 }
 
 // mock structs
-type dummyApplication struct {
-	t *testing.T
-}
-
-func (application *dummyApplication) Start(numberOfInstances int, repeatPeriod *time.Duration) {
-	assert.Fail(application.t, "Unexpected call to Start")
-}
-
-func (application *dummyApplication) Stop() {
-	assert.Fail(application.t, "Unexpected call to Stop")
-}
-
 type dummyCustomization struct {
 	t *testing.T
 }
@@ -980,4 +968,17 @@ type dummyTransport struct {
 func (transport *dummyTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	assert.Fail(transport.t, "Unexpected call to RoundTrip")
 	return nil, nil
+}
+
+type dummySchedule struct {
+	t                    *testing.T
+	waitForNextExecution func() bool
+}
+
+func (schedule *dummySchedule) WaitForNextExecution() bool {
+	if schedule.waitForNextExecution != nil {
+		return schedule.waitForNextExecution()
+	}
+	assert.Fail(schedule.t, "Unexpected call to WaitForNextExecution")
+	return false
 }

@@ -32,7 +32,7 @@ var (
 	logAppRootFunc            = logAppRoot
 	handleSessionFunc         = handleSession
 	runInstancesFunc          = runInstances
-	repeatExecutionFunc       = repeatExecution
+	scheduleExecutionFunc     = scheduleExecution
 	timeAfter                 = time.After
 	runApplicationFunc        = runApplication
 	initializeHTTPClientsFunc = initializeHTTPClients
@@ -95,6 +95,14 @@ var (
 // func pointers for injection / testing: pointerutil.go
 var (
 	reflectValueOf = reflect.ValueOf
+)
+
+// func pointers for injection / testing: schedule.go
+var (
+	isValueMatchFunc              = isValueMatch
+	isTimeForNextRunFunc          = isTimeForNextRun
+	calculateNextWaitDurationFunc = calculateNextWaitDuration
+	generateFlagsDataFunc         = generateFlagsData
 )
 
 // func pointers for injection / testing: session.go

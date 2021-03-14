@@ -89,7 +89,7 @@ func TestMarshalIgnoreError_Success(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Empty(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Empty(t *testing.T) {
 	// arrange
 	var dummyValue string
 	var dummyDataTemplate string
@@ -111,7 +111,7 @@ func TestTtryUnmarshalPrimitiveTypes_Empty(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_String(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_String(t *testing.T) {
 	// arrange
 	var dummyValue = "some value"
 	var dummyDataTemplate string
@@ -140,7 +140,7 @@ func TestTtryUnmarshalPrimitiveTypes_String(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Bool_Error(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Bool_Error(t *testing.T) {
 	// arrange
 	var dummyValue = "some invalid bool"
 	var dummyDataTemplate bool
@@ -179,7 +179,7 @@ func TestTtryUnmarshalPrimitiveTypes_Bool_Error(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Bool_NoError(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Bool_NoError(t *testing.T) {
 	// arrange
 	var dummyValue = rand.Intn(100) < 50
 	var dummyValueString = fmt.Sprintf("%v", dummyValue)
@@ -219,7 +219,7 @@ func TestTtryUnmarshalPrimitiveTypes_Bool_NoError(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Integer_Error(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Integer_Error(t *testing.T) {
 	// arrange
 	var dummyValue = "some invalid integer"
 	var dummyDataTemplate int
@@ -253,7 +253,7 @@ func TestTtryUnmarshalPrimitiveTypes_Integer_Error(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Integer_NoError(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Integer_NoError(t *testing.T) {
 	// arrange
 	var dummyValue = rand.Intn(math.MaxInt32)
 	var dummyValueString = fmt.Sprintf("%v", dummyValue)
@@ -288,7 +288,7 @@ func TestTtryUnmarshalPrimitiveTypes_Integer_NoError(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Int64_Error(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Int64_Error(t *testing.T) {
 	// arrange
 	var dummyValue = "some invalid int64"
 	var dummyDataTemplate int64
@@ -322,7 +322,7 @@ func TestTtryUnmarshalPrimitiveTypes_Int64_Error(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Int64_NoError(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Int64_NoError(t *testing.T) {
 	// arrange
 	var dummyValue = rand.Int63()
 	var dummyValueString = fmt.Sprintf("%v", dummyValue)
@@ -357,7 +357,7 @@ func TestTtryUnmarshalPrimitiveTypes_Int64_NoError(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Float64_Error(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Float64_Error(t *testing.T) {
 	// arrange
 	var dummyValue = "some invalid float64"
 	var dummyDataTemplate float64
@@ -391,7 +391,7 @@ func TestTtryUnmarshalPrimitiveTypes_Float64_Error(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Float64_NoError(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Float64_NoError(t *testing.T) {
 	// arrange
 	var dummyValue = rand.Float64()
 	var dummyValueString = fmt.Sprintf("%v", dummyValue)
@@ -426,7 +426,7 @@ func TestTtryUnmarshalPrimitiveTypes_Float64_NoError(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Byte_Error(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Byte_Error(t *testing.T) {
 	// arrange
 	var dummyValue = "some invalid byte"
 	var dummyDataTemplate byte
@@ -460,7 +460,7 @@ func TestTtryUnmarshalPrimitiveTypes_Byte_Error(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_Byte_NoError(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_Byte_NoError(t *testing.T) {
 	// arrange
 	var dummyValue = byte(rand.Intn(math.MaxUint8))
 	var dummyValueString = fmt.Sprintf("%v", dummyValue)
@@ -495,7 +495,7 @@ func TestTtryUnmarshalPrimitiveTypes_Byte_NoError(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestTtryUnmarshalPrimitiveTypes_OtherTypes(t *testing.T) {
+func TestTryUnmarshalPrimitiveTypes_OtherTypes(t *testing.T) {
 	// arrange
 	var dummyValue = "some value"
 	var dummyDataTemplate error

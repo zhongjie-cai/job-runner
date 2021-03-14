@@ -2,12 +2,11 @@ package jobrunner
 
 import (
 	"sync"
-	"time"
 )
 
 // Application is the interface for job runner application
 type Application interface {
-	// Start starts the job runner according to given specifications for number of instances (in parallel) and repeat frequency defined in application
+	// Start starts the job runner according to given specifications for number of instances (in parallel) and schedule frequency defined in application
 	Start()
 	// IsRunning returns true if the job has been successfully started and is currently running
 	IsRunning() bool
@@ -21,7 +20,7 @@ type application struct {
 	name          string
 	version       string
 	instances     int
-	repeat        *time.Duration
+	schedule      Schedule
 	overlap       bool
 	session       *session
 	customization Customization
@@ -31,14 +30,14 @@ type application struct {
 }
 
 // NewApplication creates a new application for job runner hosting
-//   instances marks how many action functions to be executed in parallel at once
-//   repeat marks how often the action functions should be repeated until stop signal is given
-//   overlap marks whether allow overlapping when a previous execution is taking longer than repeat duration
+//   instances marks how many action functions to be executed in parallel at once for a single scheduled execution
+//   schedule is a CRON schedule managing when the action functions should be executed until stop signal is given
+//   overlap marks a new execution should be executed or not when a previous execution has not yet completed
 func NewApplication(
 	name string,
 	version string,
 	instances int,
-	repeat *time.Duration,
+	schedule Schedule,
 	overlap bool,
 	customization Customization,
 ) Application {
@@ -49,7 +48,7 @@ func NewApplication(
 		name,
 		version,
 		instances,
-		repeat,
+		schedule,
 		overlap,
 		&session{
 			uuidNew(),
@@ -187,8 +186,14 @@ func runInstances(app *application) {
 	waitGroup.Wait()
 }
 
-func repeatExecution(app *application) {
+func scheduleExecution(app *application) {
 	for {
+		if !app.schedule.WaitForNextExecution() {
+			break
+		}
+		if !app.started {
+			break
+		}
 		if app.overlap {
 			go runInstancesFunc(
 				app,
@@ -198,22 +203,16 @@ func repeatExecution(app *application) {
 				app,
 			)
 		}
-		<-timeAfter(
-			*app.repeat,
-		)
-		if !app.started {
-			break
-		}
 	}
 }
 
 func runApplication(app *application) {
-	if app.repeat == nil {
+	if isInterfaceValueNilFunc(app.schedule) {
 		runInstancesFunc(
 			app,
 		)
 	} else {
-		repeatExecutionFunc(
+		scheduleExecutionFunc(
 			app,
 		)
 	}

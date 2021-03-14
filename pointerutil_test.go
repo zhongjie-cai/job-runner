@@ -31,7 +31,7 @@ func TestIsInterfaceValueNil_NilInterface(t *testing.T) {
 
 func TestIsInterfaceValueNil_NilValue(t *testing.T) {
 	// arrange
-	var dummyInterface *dummyApplication
+	var dummyInterface *dummyCustomization
 
 	// mock
 	createMock(t)

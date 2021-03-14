@@ -17,7 +17,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	var dummyName = "some name"
 	var dummyVersion = "some version"
 	var dummyInstances = rand.Int()
-	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummySchedule Schedule
 	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization Customization
 	var dummySessionID = uuid.New()
@@ -43,7 +43,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 		dummyName,
 		dummyVersion,
 		dummyInstances,
-		&dummyRepeat,
+		dummySchedule,
 		dummyOverlap,
 		dummyCustomization,
 	)
@@ -57,7 +57,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	assert.Equal(t, dummyName, value.name)
 	assert.Equal(t, dummyVersion, value.version)
 	assert.Equal(t, dummyInstances, value.instances)
-	assert.Equal(t, &dummyRepeat, value.repeat)
+	assert.Equal(t, dummySchedule, value.schedule)
 	assert.Equal(t, dummyOverlap, value.overlap)
 	assert.NotNil(t, value.session)
 	assert.Equal(t, dummySessionID, value.session.id)
@@ -75,7 +75,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	var dummyName = "some name"
 	var dummyVersion = "some version"
 	var dummyInstances = rand.Int()
-	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummySchedule Schedule
 	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization = &dummyCustomization{t: t}
 	var dummySessionID = uuid.New()
@@ -101,7 +101,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 		dummyName,
 		dummyVersion,
 		dummyInstances,
-		&dummyRepeat,
+		dummySchedule,
 		dummyOverlap,
 		dummyCustomization,
 	)
@@ -115,7 +115,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	assert.Equal(t, dummyName, value.name)
 	assert.Equal(t, dummyVersion, value.version)
 	assert.Equal(t, dummyInstances, value.instances)
-	assert.Equal(t, &dummyRepeat, value.repeat)
+	assert.Equal(t, dummySchedule, value.schedule)
 	assert.Equal(t, dummyOverlap, value.overlap)
 	assert.NotNil(t, value.session)
 	assert.Equal(t, dummySessionID, value.session.id)
@@ -795,97 +795,140 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestRepeatExecution_WithOverlap(t *testing.T) {
+func TestScheduleExecution_NoNextExecution(t *testing.T) {
 	// arrange
-	var dummyRepeat = time.Duration(rand.Intn(100))
-	var dummyTimeAfter = make(chan time.Time)
+	var dummySchedule = &dummySchedule{t: t}
 	var dummyApplication = &application{
-		name:    "some name",
-		repeat:  &dummyRepeat,
-		started: true,
-		overlap: true,
+		name:     "some name",
+		schedule: dummySchedule,
+		started:  true,
+		overlap:  true,
 	}
+	var scheduleWaitForNextExecutionExpected int
+	var scheduleWaitForNextExecutionCalled int
 
 	// mock
 	createMock(t)
 
 	// expect
-	runInstancesFuncExpected = 2
-	runInstancesFunc = func(app *application) {
-		runInstancesFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		app.started = (runInstancesFuncCalled < runInstancesFuncExpected)
-		dummyTimeAfter <- time.Now()
-	}
-	timeAfterExpected = 2
-	timeAfter = func(d time.Duration) <-chan time.Time {
-		timeAfterCalled++
-		assert.Equal(t, dummyRepeat, d)
-		return dummyTimeAfter
+	scheduleWaitForNextExecutionExpected = 1
+	dummySchedule.waitForNextExecution = func() bool {
+		scheduleWaitForNextExecutionCalled++
+		return false
 	}
 
 	// SUT + act
-	repeatExecution(
+	scheduleExecution(
 		dummyApplication,
 	)
 
 	// verify
 	verifyAll(t)
+	assert.Equal(t, scheduleWaitForNextExecutionExpected, scheduleWaitForNextExecutionCalled, "Unexpected number of calls to schedule.Wait")
 }
 
-func TestRepeatExecution_NoOverlap(t *testing.T) {
+func TestScheduleExecution_WithOverlap(t *testing.T) {
 	// arrange
-	var dummyRepeat = time.Duration(rand.Intn(100))
-	var dummyTimeAfter = make(chan time.Time)
+	var dummySchedule = &dummySchedule{t: t}
 	var dummyApplication = &application{
-		name:    "some name",
-		repeat:  &dummyRepeat,
-		started: true,
-		overlap: false,
+		name:     "some name",
+		schedule: dummySchedule,
+		started:  true,
+		overlap:  true,
 	}
+	var scheduleWaitForNextExecutionExpected int
+	var scheduleWaitForNextExecutionCalled int
+	var controlFlag = make(chan bool)
 
 	// mock
 	createMock(t)
 
 	// expect
+	scheduleWaitForNextExecutionExpected = 3
+	dummySchedule.waitForNextExecution = func() bool {
+		scheduleWaitForNextExecutionCalled++
+		<-controlFlag
+		return true
+	}
 	runInstancesFuncExpected = 2
 	runInstancesFunc = func(app *application) {
 		runInstancesFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 		app.started = (runInstancesFuncCalled < runInstancesFuncExpected)
-	}
-	timeAfterExpected = 2
-	timeAfter = func(d time.Duration) <-chan time.Time {
-		timeAfterCalled++
-		assert.Equal(t, dummyRepeat, d)
-		return dummyTimeAfter
+		controlFlag <- true
 	}
 
 	// SUT + act
-	go repeatExecution(
+	go scheduleExecution(
 		dummyApplication,
 	)
 
 	// push
-	dummyTimeAfter <- time.Now()
-	dummyTimeAfter <- time.Now()
+	controlFlag <- true
 
 	// verify
 	verifyAll(t)
+	assert.Equal(t, scheduleWaitForNextExecutionExpected, scheduleWaitForNextExecutionCalled, "Unexpected number of calls to schedule.Wait")
 }
 
-func TestRunApplication_NoRepeat(t *testing.T) {
+func TestScheduleExecution_NoOverlap(t *testing.T) {
+	// arrange
+	var dummySchedule = &dummySchedule{t: t}
+	var dummyApplication = &application{
+		name:     "some name",
+		schedule: dummySchedule,
+		started:  true,
+		overlap:  false,
+	}
+	var scheduleWaitForNextExecutionExpected int
+	var scheduleWaitForNextExecutionCalled int
+
+	// mock
+	createMock(t)
+
+	// expect
+	scheduleWaitForNextExecutionExpected = 3
+	dummySchedule.waitForNextExecution = func() bool {
+		scheduleWaitForNextExecutionCalled++
+		return true
+	}
+	runInstancesFuncExpected = 2
+	runInstancesFunc = func(app *application) {
+		runInstancesFuncCalled++
+		assert.Equal(t, dummyApplication, app)
+		app.started = (runInstancesFuncCalled < runInstancesFuncExpected)
+	}
+
+	// SUT + act
+	scheduleExecution(
+		dummyApplication,
+	)
+
+	// verify
+	verifyAll(t)
+	assert.Equal(t, scheduleWaitForNextExecutionExpected, scheduleWaitForNextExecutionCalled, "Unexpected number of calls to schedule.Wait")
+}
+
+func TestRunApplication_NoSchedule(t *testing.T) {
 	// arrange
 	var dummyShutdown = make(chan bool)
+	var dummySchedule = &dummySchedule{t: t}
 	var dummyApplication = &application{
 		name:     "some name",
 		shutdown: dummyShutdown,
+		schedule: dummySchedule,
 	}
 
 	// mock
 	createMock(t)
 
 	// expect
+	isInterfaceValueNilFuncExpected = 1
+	isInterfaceValueNilFunc = func(i interface{}) bool {
+		isInterfaceValueNilFuncCalled++
+		assert.Equal(t, dummySchedule, i)
+		return true
+	}
 	runInstancesFuncExpected = 1
 	runInstancesFunc = func(app *application) {
 		runInstancesFuncCalled++
@@ -904,23 +947,29 @@ func TestRunApplication_NoRepeat(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestRunApplication_WithRepeat(t *testing.T) {
+func TestRunApplication_WithSchedule(t *testing.T) {
 	// arrange
 	var dummyShutdown = make(chan bool)
-	var dummyRepeat = time.Duration(rand.Intn(100))
+	var dummySchedule = &dummySchedule{t: t}
 	var dummyApplication = &application{
 		name:     "some name",
 		shutdown: dummyShutdown,
-		repeat:   &dummyRepeat,
+		schedule: dummySchedule,
 	}
 
 	// mock
 	createMock(t)
 
 	// expect
-	repeatExecutionFuncExpected = 1
-	repeatExecutionFunc = func(app *application) {
-		repeatExecutionFuncCalled++
+	isInterfaceValueNilFuncExpected = 1
+	isInterfaceValueNilFunc = func(i interface{}) bool {
+		isInterfaceValueNilFuncCalled++
+		assert.Equal(t, dummySchedule, i)
+		return false
+	}
+	scheduleExecutionFuncExpected = 1
+	scheduleExecutionFunc = func(app *application) {
+		scheduleExecutionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 	}
 
