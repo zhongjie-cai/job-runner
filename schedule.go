@@ -5,218 +5,145 @@ import (
 )
 
 type Schedule interface {
-	// WaitForNextExecution should internally pause the running goroutine and wait till a next schedule is anticipated
-	//                      return true when a next execution should be conducted, or false to indicate a termination
-	WaitForNextExecution() bool
+	// NextSchedule returns the time instance pointing to when a next schedule should happen;
+	//   if no schedule can be made, return nil to indicate the termination of application
+	NextSchedule() *time.Time
 }
 
-type CronSchedule struct {
-	seconds  []bool
-	minutes  []bool
-	hours    []bool
-	weekdays []bool
-	days     []bool
-	months   []bool
-	years    map[int]bool
-	from     *time.Time
-	till     *time.Time
-	last     *time.Time
+type schedule struct {
+	second      int
+	secondIndex int
+	seconds     []int
+	minute      int
+	minuteIndex int
+	minutes     []int
+	hour        int
+	hourIndex   int
+	hours       []int
+	day         int
+	dayIndex    int
+	days        []int
+	month       int
+	monthIndex  int
+	months      []int
+	year        int
+	yearIndex   int
+	years       []int
+	weekdays    map[time.Weekday]bool
+	till        *time.Time
 }
 
-// NewCronSchedule creates an empty CronSchedule for consumer to manually configure a preferred schedule
-func NewCronSchedule() *CronSchedule {
-	return &CronSchedule{
-		[]bool{},
-		[]bool{},
-		[]bool{},
-		[]bool{},
-		[]bool{},
-		[]bool{},
-		map[int]bool{},
-		nil,
-		nil,
-		nil,
+func moveValueIndex(
+	oldIndex int,
+	values []int,
+	maxValue int,
+) (int, int, bool) {
+	var newIndex = oldIndex + 1
+	if newIndex >= len(values) ||
+		values[newIndex] >= maxValue {
+		return values[0], 0, true
 	}
+	return values[newIndex], newIndex, false
 }
 
-func isValueMatch(value int, values []bool) bool {
-	if len(values) == 0 {
-		return true
-	}
-	return values[value]
-}
-
-func isTimeForNextRun(timeNext time.Time, cronSchedule *CronSchedule) bool {
-	if !isValueMatchFunc(timeNext.Second(), cronSchedule.seconds) {
-		return false
-	}
-	if !isValueMatchFunc(timeNext.Minute(), cronSchedule.minutes) {
-		return false
-	}
-	if !isValueMatchFunc(timeNext.Hour(), cronSchedule.hours) {
-		return false
-	}
-	if !isValueMatchFunc(int(timeNext.Weekday()), cronSchedule.weekdays) {
-		return false
-	}
-	if !isValueMatchFunc(timeNext.Day(), cronSchedule.days) {
-		return false
-	}
-	if !isValueMatchFunc(int(timeNext.Month()), cronSchedule.months) {
-		return false
-	}
-	if len(cronSchedule.years) > 0 &&
-		!cronSchedule.years[timeNext.Year()] {
-		return false
-	}
-	return true
-}
-
-func calculateNextWaitDuration(cronSchedule *CronSchedule) (time.Time, time.Duration) {
-	var timeLast = timeNow()
-	if cronSchedule.last != nil {
-		timeLast = *cronSchedule.last
-	}
-	if cronSchedule.from != nil &&
-		cronSchedule.from.After(timeLast) {
-		timeLast = *cronSchedule.from
-	}
-	var timeNext = timeLast.Truncate(time.Second)
-	// this can be costly, especially if you set it up that the next run would be actually in years
-	//   gladly, the trade-off here is acceptable as you anyway would wait for years for a next run
-	for {
-		timeNext = timeNext.Add(1 * time.Second)
-		if isTimeForNextRunFunc(
-			timeNext,
-			cronSchedule,
-		) {
-			return timeNext, timeNext.Sub(timeNow())
-		}
-	}
-}
-
-func (cronSchedule *CronSchedule) WaitForNextExecution() bool {
-	var currentLocalTime = timeNow()
-	if cronSchedule.till != nil &&
-		cronSchedule.till.Before(currentLocalTime) {
-		// causes the schedule to terminate
-		return false
-	}
-	// pause the running goroutine for the calculated duration
-	var timeNext, waitDuration = calculateNextWaitDurationFunc(
-		cronSchedule,
+func getDaysOfMonth(year int, month int) int {
+	// plays a trick that time.Date accepts values outside of normal ranges
+	//   so setting day to 0 would actually yield the last day of a previous month
+	//   that helps calculate the number of days within a given month
+	var lastDay = timeDate(
+		year,                   // current year so no change
+		time.Month(month+2),    // slide to next month, yields back as current month by the trick
+		0,                      // the essential part of this trick - 0-day!
+		0, 0, 0, 0, time.Local, // other values don't matter, so use defaults
 	)
-	<-timeAfter(
-		waitDuration,
-	)
-	cronSchedule.last = &timeNext
-	return true
+	return lastDay.Day()
 }
 
-func generateFlagsData(data []bool, total int, values ...int) []bool {
-	if len(data) == 0 {
-		data = make([]bool, total)
-	}
-	if len(values) == 0 {
-		for value := 0; value < total; value++ {
-			data[value] = true
-		}
-	} else {
-		for _, value := range values {
-			if value >= 0 && value < total {
-				data[value] = true
+func constructTimeBySchedule(schedule *schedule) time.Time {
+	return timeDate(
+		schedule.year,
+		time.Month(schedule.month+1),
+		schedule.day+1,
+		schedule.hour,
+		schedule.minute,
+		schedule.second,
+		0,
+		time.Local,
+	)
+}
+
+func updateScheduleIndex(
+	schedule *schedule,
+) {
+	var reset bool
+	// get next second from schedule data
+	schedule.second, schedule.secondIndex, reset = moveValueIndexFunc(
+		schedule.secondIndex,
+		schedule.seconds,
+		60,
+	)
+	if reset {
+		// second reset, thus get next minute from schedule data
+		schedule.minute, schedule.minuteIndex, reset = moveValueIndexFunc(
+			schedule.minuteIndex,
+			schedule.minutes,
+			60,
+		)
+		if reset {
+			// minute reset, thus get next hour from schedule data
+			schedule.hour, schedule.hourIndex, reset = moveValueIndexFunc(
+				schedule.hourIndex,
+				schedule.hours,
+				24,
+			)
+			if reset {
+				// hour reset, thus get next day from schedule data
+				schedule.day, schedule.dayIndex, reset = moveValueIndexFunc(
+					schedule.dayIndex,
+					schedule.days,
+					getDaysOfMonthFunc(
+						schedule.year,
+						schedule.month,
+					),
+				)
+				if reset {
+					// day reset, thus get next month from schedule data
+					schedule.month, schedule.monthIndex, reset = moveValueIndexFunc(
+						schedule.monthIndex,
+						schedule.months,
+						12,
+					)
+					if reset {
+						// month reset, thus get next year from schedule data
+						schedule.year, schedule.yearIndex, _ = moveValueIndexFunc(
+							schedule.yearIndex,
+							schedule.years,
+							9999, // hopefully nobody is still using this library by year 9999?
+						)
+					}
+				}
 			}
 		}
 	}
-	return data
 }
 
-// OnSeconds sets up the CronSchedule on second's level; if not called or called with no parameters, then every second is considered to be set up
-func (cronSchedule *CronSchedule) OnSeconds(seconds ...int) *CronSchedule {
-	cronSchedule.seconds = generateFlagsDataFunc(
-		cronSchedule.seconds,
-		60,
-		seconds...,
-	)
-	return cronSchedule
-}
-
-// OnMinutes sets up the CronSchedule on minute's level; if not called or called with no parameters, then every minute is considered to be set up
-func (cronSchedule *CronSchedule) OnMinutes(minutes ...int) *CronSchedule {
-	cronSchedule.minutes = generateFlagsDataFunc(
-		cronSchedule.minutes,
-		60,
-		minutes...,
-	)
-	return cronSchedule
-}
-
-// AtHours sets up the CronSchedule on hour's level; if not called or called with no parameters, then every hour is considered to be set up
-func (cronSchedule *CronSchedule) AtHours(hours ...int) *CronSchedule {
-	cronSchedule.hours = generateFlagsDataFunc(
-		cronSchedule.hours,
-		24,
-		hours...,
-	)
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on weekday's level; if not called or called with no parameters, then every weekday is considered to be set up
-func (cronSchedule *CronSchedule) OnWeekdays(weekdays ...time.Weekday) *CronSchedule {
-	var weekdaysInInt = []int{}
-	for _, weekday := range weekdays {
-		weekdaysInInt = append(weekdaysInInt, int(weekday))
+func (schedule *schedule) NextSchedule() *time.Time {
+	var currentLocalTime = timeNow()
+	if schedule.till != nil &&
+		schedule.till.Before(currentLocalTime) {
+		// causes the schedule to terminate
+		return nil
 	}
-	cronSchedule.weekdays = generateFlagsDataFunc(
-		cronSchedule.weekdays,
-		7,
-		weekdaysInInt...,
+	// load next schedule time
+	var timeNext = constructTimeByScheduleFunc(
+		schedule,
 	)
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on day's level; if not called or called with no parameters, then every day is considered to be set up
-func (cronSchedule *CronSchedule) OnDays(days ...int) *CronSchedule {
-	cronSchedule.days = generateFlagsDataFunc(
-		cronSchedule.days,
-		31,
-		days...,
-	)
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on month's level; if not called or called with no parameters, then every month is considered to be set up
-func (cronSchedule *CronSchedule) InMonths(months ...time.Month) *CronSchedule {
-	var monthsInInt = []int{}
-	for _, month := range months {
-		monthsInInt = append(monthsInInt, int(month))
+	if timeNext.Before(currentLocalTime) {
+		// in past means schedule has been reset, so no longer runnable
+		return nil
 	}
-	cronSchedule.months = generateFlagsDataFunc(
-		cronSchedule.months,
-		13, // due to the fact that month value start from 1 instead of 0...
-		monthsInInt...,
+	updateScheduleIndexFunc(
+		schedule,
 	)
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on year's level; if not called or called with no parameters, then every year is considered to be set up
-func (cronSchedule *CronSchedule) InYears(years ...int) *CronSchedule {
-	if len(years) > 0 {
-		for _, year := range years {
-			cronSchedule.years[year] = true
-		}
-	}
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on second's level; if not called or called with no parameters, then every second is considered to be set up
-func (cronSchedule *CronSchedule) From(start time.Time) *CronSchedule {
-	cronSchedule.from = &start
-	return cronSchedule
-}
-
-// OnSeconds sets up the CronSchedule on second's level; if not called or called with no parameters, then every second is considered to be set up
-func (cronSchedule *CronSchedule) Till(end time.Time) *CronSchedule {
-	cronSchedule.till = &end
-	return cronSchedule
+	return &timeNext
 }

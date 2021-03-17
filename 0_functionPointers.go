@@ -31,6 +31,7 @@ var (
 	beginApplicationFunc      = beginApplication
 	logAppRootFunc            = logAppRoot
 	handleSessionFunc         = handleSession
+	waitForNextRunFunc        = waitForNextRun
 	runInstancesFunc          = runInstances
 	scheduleExecutionFunc     = scheduleExecution
 	timeAfter                 = time.After
@@ -99,10 +100,25 @@ var (
 
 // func pointers for injection / testing: schedule.go
 var (
-	isValueMatchFunc              = isValueMatch
-	isTimeForNextRunFunc          = isTimeForNextRun
-	calculateNextWaitDurationFunc = calculateNextWaitDuration
+	timeDate                    = time.Date
+	moveValueIndexFunc          = moveValueIndex
+	getDaysOfMonthFunc          = getDaysOfMonth
+	constructTimeByScheduleFunc = constructTimeBySchedule
+	updateScheduleIndexFunc     = updateScheduleIndex
+)
+
+// func pointers for injection / testing: schedulemaker.go
+var (
 	generateFlagsDataFunc         = generateFlagsData
+	constructValueSliceFunc       = constructValueSlice
+	constructWeekdayMapFunc       = constructWeekdayMap
+	constructYearSliceFunc        = constructYearSlice
+	findValueMatchFunc            = findValueMatch
+	isWeekdayMatchFunc            = isWeekdayMatch
+	constructScheduleTemplateFunc = constructScheduleTemplate
+	determineScheduleIndexFunc    = determineScheduleIndex
+	initialiseScheduleFunc        = initialiseSchedule
+	sortInts                      = sort.Ints
 )
 
 // func pointers for injection / testing: session.go

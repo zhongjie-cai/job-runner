@@ -165,6 +165,34 @@ func postBootstraping(app *application) bool {
 	return true
 }
 
+func waitForNextRun(app *application) {
+	var timeNext = app.schedule.NextSchedule()
+	if timeNext == nil {
+		logAppRootFunc(
+			app.session,
+			"application",
+			"waitForNextRun",
+			"No next schedule available, terminating execution",
+		)
+		app.started = false
+		return
+	}
+	var waitDuration = timeNext.Sub(
+		timeNow(),
+	)
+	logAppRootFunc(
+		app.session,
+		"application",
+		"waitForNextRun",
+		"Next run at [%v]: waiting for [%v]",
+		*timeNext,
+		waitDuration,
+	)
+	<-timeAfter(
+		waitDuration,
+	)
+}
+
 func runInstances(app *application) {
 	var waitGroup sync.WaitGroup
 	for id := 0; id < app.instances; id++ {
@@ -188,9 +216,9 @@ func runInstances(app *application) {
 
 func scheduleExecution(app *application) {
 	for {
-		if !app.schedule.WaitForNextExecution() {
-			break
-		}
+		waitForNextRunFunc(
+			app,
+		)
 		if !app.started {
 			break
 		}
