@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -874,6 +875,7 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 		instances: len(dummyErrors),
 	}
 	var expectedIndex = map[int]bool{}
+	var writeLock sync.Mutex
 
 	// mock
 	createMock(t)
@@ -883,7 +885,9 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	handleSessionFunc = func(app *application, index int) error {
 		handleSessionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
+		writeLock.Lock()
 		expectedIndex[index] = true
+		writeLock.Unlock()
 		return dummyErrors[index]
 	}
 
