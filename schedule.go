@@ -31,6 +31,7 @@ type schedule struct {
 	years       []int
 	weekdays    map[time.Weekday]bool
 	till        *time.Time
+	timezone    *time.Location
 }
 
 func moveValueIndex(
@@ -68,7 +69,7 @@ func constructTimeBySchedule(schedule *schedule) time.Time {
 		schedule.minute,
 		schedule.second,
 		0,
-		time.Local,
+		schedule.timezone,
 	)
 }
 

@@ -180,13 +180,15 @@ func TestGetDaysOfMonth_Integration(t *testing.T) {
 
 func TestConstructTimeBySchedule(t *testing.T) {
 	// arrange
+	var dummyLocation, _ = time.LoadLocation("China/Beijing")
 	var dummySchedule = &schedule{
-		year:   rand.Intn(100) + 2000,
-		month:  rand.Intn(12),
-		day:    rand.Intn(31),
-		hour:   rand.Intn(24),
-		minute: rand.Intn(60),
-		second: rand.Intn(60),
+		year:     rand.Intn(100) + 2000,
+		month:    rand.Intn(12),
+		day:      rand.Intn(31),
+		hour:     rand.Intn(24),
+		minute:   rand.Intn(60),
+		second:   rand.Intn(60),
+		timezone: dummyLocation,
 	}
 	var dummyTime = time.Now()
 
@@ -204,7 +206,7 @@ func TestConstructTimeBySchedule(t *testing.T) {
 		assert.Equal(t, dummySchedule.minute, min)
 		assert.Equal(t, dummySchedule.second, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 

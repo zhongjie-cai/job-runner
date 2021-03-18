@@ -492,6 +492,54 @@ func TestScheduleMaker_Till(t *testing.T) {
 	verifyAll(t)
 }
 
+func TestScheduleMaker_Timezone_NilTimezone(t *testing.T) {
+	// arrange
+	var dummyScheduleMaker = &scheduleMaker{}
+	var dummyTimezone *time.Location
+
+	// mock
+	createMock(t)
+
+	// SUT
+	var sut = dummyScheduleMaker
+
+	// act
+	var result = sut.Timezone(
+		dummyTimezone,
+	)
+
+	// assert
+	assert.Equal(t, dummyScheduleMaker, result)
+	assert.Equal(t, time.Local, dummyScheduleMaker.timezone)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestScheduleMaker_Timezone_ValidTimezone(t *testing.T) {
+	// arrange
+	var dummyScheduleMaker = &scheduleMaker{}
+	var dummyTimezone, _ = time.LoadLocation("Asia/Shanghai")
+
+	// mock
+	createMock(t)
+
+	// SUT
+	var sut = dummyScheduleMaker
+
+	// act
+	var result = sut.Timezone(
+		dummyTimezone,
+	)
+
+	// assert
+	assert.Equal(t, dummyScheduleMaker, result)
+	assert.Equal(t, dummyTimezone, dummyScheduleMaker.timezone)
+
+	// verify
+	verifyAll(t)
+}
+
 func TestConstructValueSlice_EmptyValues(t *testing.T) {
 	// arrange
 	var dummyValues = []bool{}
@@ -1118,13 +1166,15 @@ func TestDetermineScheduleIndex_YearIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummySchedule = &schedule{
-		seconds: dummySeconds,
-		minutes: dummyMinutes,
-		hours:   dummyHours,
-		days:    dummyDays,
-		months:  dummyMonths,
-		years:   dummyYears,
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		timezone: dummyLocation,
 	}
 	var dummyYear = rand.Intn(100)
 	var dummyYearIndex = rand.Intn(100)
@@ -1151,7 +1201,7 @@ func TestDetermineScheduleIndex_YearIncrement(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1179,13 +1229,15 @@ func TestDetermineScheduleIndex_MonthOverflow(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummySchedule = &schedule{
-		seconds: dummySeconds,
-		minutes: dummyMinutes,
-		hours:   dummyHours,
-		days:    dummyDays,
-		months:  dummyMonths,
-		years:   dummyYears,
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		timezone: dummyLocation,
 	}
 	var dummyYear = rand.Intn(100)
 	var dummyYearIndex = rand.Intn(100)
@@ -1219,7 +1271,7 @@ func TestDetermineScheduleIndex_MonthOverflow(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1247,13 +1299,15 @@ func TestDetermineScheduleIndex_MonthIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummySchedule = &schedule{
-		seconds: dummySeconds,
-		minutes: dummyMinutes,
-		hours:   dummyHours,
-		days:    dummyDays,
-		months:  dummyMonths,
-		years:   dummyYears,
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		timezone: dummyLocation,
 	}
 	var dummyYear = rand.Intn(100)
 	var dummyYearIndex = rand.Intn(100)
@@ -1287,7 +1341,7 @@ func TestDetermineScheduleIndex_MonthIncrement(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1315,13 +1369,15 @@ func TestDetermineScheduleIndex_DayOverflow(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummySchedule = &schedule{
-		seconds: dummySeconds,
-		minutes: dummyMinutes,
-		hours:   dummyHours,
-		days:    dummyDays,
-		months:  dummyMonths,
-		years:   dummyYears,
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		timezone: dummyLocation,
 	}
 	var dummyYear = rand.Intn(100)
 	var dummyYearIndex = rand.Intn(100)
@@ -1361,7 +1417,7 @@ func TestDetermineScheduleIndex_DayOverflow(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1389,13 +1445,15 @@ func TestDetermineScheduleIndex_DayIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummySchedule = &schedule{
-		seconds: dummySeconds,
-		minutes: dummyMinutes,
-		hours:   dummyHours,
-		days:    dummyDays,
-		months:  dummyMonths,
-		years:   dummyYears,
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		timezone: dummyLocation,
 	}
 	var dummyYear = rand.Intn(100)
 	var dummyYearIndex = rand.Intn(100)
@@ -1435,7 +1493,7 @@ func TestDetermineScheduleIndex_DayIncrement(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1463,6 +1521,7 @@ func TestDetermineScheduleIndex_WeekdayMismatch(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1475,6 +1534,7 @@ func TestDetermineScheduleIndex_WeekdayMismatch(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -1524,7 +1584,7 @@ func TestDetermineScheduleIndex_WeekdayMismatch(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1552,6 +1612,7 @@ func TestDetermineScheduleIndex_HourOverflow(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1564,6 +1625,7 @@ func TestDetermineScheduleIndex_HourOverflow(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -1619,7 +1681,7 @@ func TestDetermineScheduleIndex_HourOverflow(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1647,6 +1709,7 @@ func TestDetermineScheduleIndex_HourIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1659,6 +1722,7 @@ func TestDetermineScheduleIndex_HourIncrement(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -1714,7 +1778,7 @@ func TestDetermineScheduleIndex_HourIncrement(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1742,6 +1806,7 @@ func TestDetermineScheduleIndex_MinuteOverflow(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1754,6 +1819,7 @@ func TestDetermineScheduleIndex_MinuteOverflow(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -1815,7 +1881,7 @@ func TestDetermineScheduleIndex_MinuteOverflow(t *testing.T) {
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1843,6 +1909,7 @@ func TestDetermineScheduleIndex_MinuteIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1855,6 +1922,7 @@ func TestDetermineScheduleIndex_MinuteIncrement(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -1916,7 +1984,7 @@ func TestDetermineScheduleIndex_MinuteIncrement(t *testing.T) {
 		assert.Equal(t, dummyMinute, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -1944,6 +2012,7 @@ func TestDetermineScheduleIndex_SecondOverflow(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -1956,6 +2025,7 @@ func TestDetermineScheduleIndex_SecondOverflow(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)
@@ -2023,7 +2093,7 @@ func TestDetermineScheduleIndex_SecondOverflow(t *testing.T) {
 		assert.Equal(t, dummyStart.Minute()+1, min)
 		assert.Zero(t, sec)
 		assert.Zero(t, nsec)
-		assert.Equal(t, time.Local, loc)
+		assert.Equal(t, dummyLocation, loc)
 		return dummyTime
 	}
 
@@ -2051,6 +2121,7 @@ func TestDetermineScheduleIndex_NoOverflow_NoIncrement(t *testing.T) {
 	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
 	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
 	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyLocation, _ = time.LoadLocation("Asia/Shanghai")
 	var dummyWeekdays = map[time.Weekday]bool{
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
 		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
@@ -2063,6 +2134,7 @@ func TestDetermineScheduleIndex_NoOverflow_NoIncrement(t *testing.T) {
 		days:     dummyDays,
 		months:   dummyMonths,
 		years:    dummyYears,
+		timezone: dummyLocation,
 		weekdays: dummyWeekdays,
 	}
 	var dummyYear = rand.Intn(100)

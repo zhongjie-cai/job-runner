@@ -23,6 +23,8 @@ type ScheduleMaker interface {
 	From(start time.Time) ScheduleMaker
 	// Till sets up the schedule maker for its end datetime; if not called or called with no parameters, then the schedule won't stop until its data increment
 	Till(end time.Time) ScheduleMaker
+	// Timezone sets up the schedule maker for its timezone location; if not called or called with no parameters, then the schedule takes time.Local as default
+	Timezone(timezone *time.Location) ScheduleMaker
 	// Done returns a compiled schedule based on all previously configured settings
 	Schedule() (Schedule, error)
 }
@@ -37,6 +39,7 @@ type scheduleMaker struct {
 	years    map[int]bool
 	from     *time.Time
 	till     *time.Time
+	timezone *time.Location
 }
 
 // NewScheduleMaker creates an empty scheduleMaker for consumer to manually configure a preferred schedule
@@ -51,6 +54,7 @@ func NewScheduleMaker() ScheduleMaker {
 		map[int]bool{}, // years
 		nil,            // from
 		nil,            // till
+		time.Local,     // timezone
 	}
 }
 
@@ -169,6 +173,16 @@ func (scheduleMaker *scheduleMaker) Till(end time.Time) ScheduleMaker {
 	return scheduleMaker
 }
 
+// Timezone sets up the schedule maker for its timezone location; if not called or called with no parameters, then the schedule takes time.Local as default
+func (scheduleMaker *scheduleMaker) Timezone(timezone *time.Location) ScheduleMaker {
+	if timezone != nil {
+		scheduleMaker.timezone = timezone
+	} else {
+		scheduleMaker.timezone = time.Local
+	}
+	return scheduleMaker
+}
+
 func constructValueSlice(values []bool, total int) []int {
 	var data = []int{}
 	if len(values) == 0 {
@@ -237,6 +251,7 @@ func constructScheduleTemplate(scheduleMaker *scheduleMaker) *schedule {
 		years:       constructYearSliceFunc(scheduleMaker.years),
 		weekdays:    constructWeekdayMapFunc(scheduleMaker.weekdays),
 		till:        scheduleMaker.till,
+		timezone:    scheduleMaker.timezone,
 	}
 	schedule.second = schedule.seconds[schedule.secondIndex]
 	schedule.minute = schedule.minutes[schedule.minuteIndex]
@@ -301,7 +316,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -319,7 +334,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	} else if increment {
@@ -332,7 +347,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -350,7 +365,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	} else if increment {
@@ -363,7 +378,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -382,7 +397,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -400,7 +415,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	} else if increment {
@@ -413,7 +428,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -431,7 +446,7 @@ func determineScheduleIndex(
 				0,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	} else if increment {
@@ -444,7 +459,7 @@ func determineScheduleIndex(
 				schedule.minute,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
@@ -462,7 +477,7 @@ func determineScheduleIndex(
 				start.Minute()+1,
 				0,
 				0,
-				time.Local,
+				schedule.timezone,
 			),
 			nil
 	}
