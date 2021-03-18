@@ -44,10 +44,12 @@ var (
 	logAppRootFuncCalled                   int
 	handleSessionFuncExpected              int
 	handleSessionFuncCalled                int
+	waitForNextRunFuncExpected             int
+	waitForNextRunFuncCalled               int
 	runInstancesFuncExpected               int
 	runInstancesFuncCalled                 int
-	repeatExecutionFuncExpected            int
-	repeatExecutionFuncCalled              int
+	scheduleExecutionFuncExpected          int
+	scheduleExecutionFuncCalled            int
 	timeAfterExpected                      int
 	timeAfterCalled                        int
 	runApplicationFuncExpected             int
@@ -106,6 +108,36 @@ var (
 	regexpMatchStringCalled                int
 	reflectValueOfExpected                 int
 	reflectValueOfCalled                   int
+	timeDateExpected                       int
+	timeDateCalled                         int
+	moveValueIndexFuncExpected             int
+	moveValueIndexFuncCalled               int
+	getDaysOfMonthFuncExpected             int
+	getDaysOfMonthFuncCalled               int
+	constructTimeByScheduleFuncExpected    int
+	constructTimeByScheduleFuncCalled      int
+	updateScheduleIndexFuncExpected        int
+	updateScheduleIndexFuncCalled          int
+	generateFlagsDataFuncExpected          int
+	generateFlagsDataFuncCalled            int
+	constructValueSliceFuncExpected        int
+	constructValueSliceFuncCalled          int
+	constructWeekdayMapFuncExpected        int
+	constructWeekdayMapFuncCalled          int
+	constructYearSliceFuncExpected         int
+	constructYearSliceFuncCalled           int
+	findValueMatchFuncExpected             int
+	findValueMatchFuncCalled               int
+	isWeekdayMatchFuncExpected             int
+	isWeekdayMatchFuncCalled               int
+	constructScheduleTemplateFuncExpected  int
+	constructScheduleTemplateFuncCalled    int
+	determineScheduleIndexFuncExpected     int
+	determineScheduleIndexFuncCalled       int
+	initialiseScheduleFuncExpected         int
+	initialiseScheduleFuncCalled           int
+	sortIntsExpected                       int
+	sortIntsCalled                         int
 	ioutilReadAllExpected                  int
 	ioutilReadAllCalled                    int
 	ioutilNopCloserExpected                int
@@ -248,15 +280,20 @@ func createMock(t *testing.T) {
 		handleSessionFuncCalled++
 		return nil
 	}
+	waitForNextRunFuncExpected = 0
+	waitForNextRunFuncCalled = 0
+	waitForNextRunFunc = func(app *application) {
+		waitForNextRunFuncCalled++
+	}
 	runInstancesFuncExpected = 0
 	runInstancesFuncCalled = 0
 	runInstancesFunc = func(app *application) {
 		runInstancesFuncCalled++
 	}
-	repeatExecutionFuncExpected = 0
-	repeatExecutionFuncCalled = 0
-	repeatExecutionFunc = func(app *application) {
-		repeatExecutionFuncCalled++
+	scheduleExecutionFuncExpected = 0
+	scheduleExecutionFuncCalled = 0
+	scheduleExecutionFunc = func(app *application) {
+		scheduleExecutionFuncCalled++
 	}
 	timeAfterExpected = 0
 	timeAfterCalled = 0
@@ -427,6 +464,94 @@ func createMock(t *testing.T) {
 	reflectValueOf = func(i interface{}) reflect.Value {
 		reflectValueOfCalled++
 		return reflect.Value{}
+	}
+	timeDateExpected = 0
+	timeDateCalled = 0
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		return time.Time{}
+	}
+	moveValueIndexFuncExpected = 0
+	moveValueIndexFuncCalled = 0
+	moveValueIndexFunc = func(oldIndex int, values []int, maxValue int) (int, int, bool) {
+		moveValueIndexFuncCalled++
+		return 0, 0, false
+	}
+	getDaysOfMonthFuncExpected = 0
+	getDaysOfMonthFuncCalled = 0
+	getDaysOfMonthFunc = func(year, month int) int {
+		getDaysOfMonthFuncCalled++
+		return 0
+	}
+	constructTimeByScheduleFuncExpected = 0
+	constructTimeByScheduleFuncCalled = 0
+	constructTimeByScheduleFunc = func(schedule *schedule) time.Time {
+		constructTimeByScheduleFuncCalled++
+		return time.Time{}
+	}
+	updateScheduleIndexFuncExpected = 0
+	updateScheduleIndexFuncCalled = 0
+	updateScheduleIndexFunc = func(schedule *schedule) {
+		updateScheduleIndexFuncCalled++
+	}
+	generateFlagsDataFuncExpected = 0
+	generateFlagsDataFuncCalled = 0
+	generateFlagsDataFunc = func(data []bool, total int, values ...int) []bool {
+		generateFlagsDataFuncCalled++
+		return nil
+	}
+	constructValueSliceFuncExpected = 0
+	constructValueSliceFuncCalled = 0
+	constructValueSliceFunc = func(values []bool, total int) []int {
+		constructValueSliceFuncCalled++
+		return nil
+	}
+	constructWeekdayMapFuncExpected = 0
+	constructWeekdayMapFuncCalled = 0
+	constructWeekdayMapFunc = func(weekdays []bool) map[time.Weekday]bool {
+		constructWeekdayMapFuncCalled++
+		return nil
+	}
+	constructYearSliceFuncExpected = 0
+	constructYearSliceFuncCalled = 0
+	constructYearSliceFunc = func(years map[int]bool) []int {
+		constructYearSliceFuncCalled++
+		return nil
+	}
+	findValueMatchFuncExpected = 0
+	findValueMatchFuncCalled = 0
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		return 0, 0, false, false
+	}
+	isWeekdayMatchFuncExpected = 0
+	isWeekdayMatchFuncCalled = 0
+	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
+		isWeekdayMatchFuncCalled++
+		return false
+	}
+	constructScheduleTemplateFuncExpected = 0
+	constructScheduleTemplateFuncCalled = 0
+	constructScheduleTemplateFunc = func(scheduleMaker *scheduleMaker) *schedule {
+		constructScheduleTemplateFuncCalled++
+		return nil
+	}
+	determineScheduleIndexFuncExpected = 0
+	determineScheduleIndexFuncCalled = 0
+	determineScheduleIndexFunc = func(start time.Time, schedule *schedule) (bool, time.Time, error) {
+		determineScheduleIndexFuncCalled++
+		return false, time.Time{}, nil
+	}
+	initialiseScheduleFuncExpected = 0
+	initialiseScheduleFuncCalled = 0
+	initialiseScheduleFunc = func(start time.Time, schedule *schedule) error {
+		initialiseScheduleFuncCalled++
+		return nil
+	}
+	sortIntsExpected = 0
+	sortIntsCalled = 0
+	sortInts = func(a []int) {
+		sortIntsCalled++
 	}
 	ioutilReadAllExpected = 0
 	ioutilReadAllCalled = 0
@@ -681,10 +806,12 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, logAppRootFuncExpected, logAppRootFuncCalled, "Unexpected number of calls to method logAppRootFunc")
 	handleSessionFunc = handleSession
 	assert.Equal(t, handleSessionFuncExpected, handleSessionFuncCalled, "Unexpected number of calls to method handleSessionFunc")
+	waitForNextRunFunc = waitForNextRun
+	assert.Equal(t, waitForNextRunFuncExpected, waitForNextRunFuncCalled, "Unexpected number of calls to method waitForNextRunFunc")
 	runInstancesFunc = runInstances
 	assert.Equal(t, runInstancesFuncExpected, runInstancesFuncCalled, "Unexpected number of calls to method runInstancesFunc")
-	repeatExecutionFunc = repeatExecution
-	assert.Equal(t, repeatExecutionFuncExpected, repeatExecutionFuncCalled, "Unexpected number of calls to method repeatExecutionFunc")
+	scheduleExecutionFunc = scheduleExecution
+	assert.Equal(t, scheduleExecutionFuncExpected, scheduleExecutionFuncCalled, "Unexpected number of calls to method scheduleExecutionFunc")
 	timeAfter = time.After
 	assert.Equal(t, timeAfterExpected, timeAfterCalled, "Unexpected number of calls to method timeAfter")
 	runApplicationFunc = runApplication
@@ -743,6 +870,36 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, regexpMatchStringExpected, regexpMatchStringCalled, "Unexpected number of calls to regexpMatchString")
 	reflectValueOf = reflect.ValueOf
 	assert.Equal(t, reflectValueOfExpected, reflectValueOfCalled, "Unexpected number of calls to reflectValueOf")
+	timeDate = time.Date
+	assert.Equal(t, timeDateExpected, timeDateCalled, "Unexpected number of calls to timeDate")
+	moveValueIndexFunc = moveValueIndex
+	assert.Equal(t, moveValueIndexFuncExpected, moveValueIndexFuncCalled, "Unexpected number of calls to moveValueIndexFunc")
+	getDaysOfMonthFunc = getDaysOfMonth
+	assert.Equal(t, getDaysOfMonthFuncExpected, getDaysOfMonthFuncCalled, "Unexpected number of calls to getDaysOfMonthFunc")
+	constructTimeByScheduleFunc = constructTimeBySchedule
+	assert.Equal(t, constructTimeByScheduleFuncExpected, constructTimeByScheduleFuncCalled, "Unexpected number of calls to constructTimeByScheduleFunc")
+	updateScheduleIndexFunc = updateScheduleIndex
+	assert.Equal(t, updateScheduleIndexFuncExpected, updateScheduleIndexFuncCalled, "Unexpected number of calls to updateScheduleIndexFunc")
+	generateFlagsDataFunc = generateFlagsData
+	assert.Equal(t, generateFlagsDataFuncExpected, generateFlagsDataFuncCalled, "Unexpected number of calls to generateFlagsDataFunc")
+	constructValueSliceFunc = constructValueSlice
+	assert.Equal(t, constructValueSliceFuncExpected, constructValueSliceFuncCalled, "Unexpected number of calls to constructValueSliceFunc")
+	constructWeekdayMapFunc = constructWeekdayMap
+	assert.Equal(t, constructWeekdayMapFuncExpected, constructWeekdayMapFuncCalled, "Unexpected number of calls to constructWeekdayMapFunc")
+	constructYearSliceFunc = constructYearSlice
+	assert.Equal(t, constructYearSliceFuncExpected, constructYearSliceFuncCalled, "Unexpected number of calls to constructYearSliceFunc")
+	findValueMatchFunc = findValueMatch
+	assert.Equal(t, findValueMatchFuncExpected, findValueMatchFuncCalled, "Unexpected number of calls to findValueMatchFunc")
+	isWeekdayMatchFunc = isWeekdayMatch
+	assert.Equal(t, isWeekdayMatchFuncExpected, isWeekdayMatchFuncCalled, "Unexpected number of calls to isWeekdayMatchFunc")
+	constructScheduleTemplateFunc = constructScheduleTemplate
+	assert.Equal(t, constructScheduleTemplateFuncExpected, constructScheduleTemplateFuncCalled, "Unexpected number of calls to constructScheduleTemplateFunc")
+	determineScheduleIndexFunc = determineScheduleIndex
+	assert.Equal(t, determineScheduleIndexFuncExpected, determineScheduleIndexFuncCalled, "Unexpected number of calls to determineScheduleIndexFunc")
+	initialiseScheduleFunc = initialiseSchedule
+	assert.Equal(t, initialiseScheduleFuncExpected, initialiseScheduleFuncCalled, "Unexpected number of calls to initialiseScheduleFunc")
+	sortInts = sort.Ints
+	assert.Equal(t, sortIntsExpected, sortIntsCalled, "Unexpected number of calls to sortInts")
 	ioutilReadAll = ioutil.ReadAll
 	assert.Equal(t, ioutilReadAllExpected, ioutilReadAllCalled, "Unexpected number of calls to ioutilReadAll")
 	ioutilNopCloser = ioutil.NopCloser
@@ -834,18 +991,6 @@ func functionPointerEquals(t *testing.T, expectFunc interface{}, actualFunc inte
 }
 
 // mock structs
-type dummyApplication struct {
-	t *testing.T
-}
-
-func (application *dummyApplication) Start(numberOfInstances int, repeatPeriod *time.Duration) {
-	assert.Fail(application.t, "Unexpected call to Start")
-}
-
-func (application *dummyApplication) Stop() {
-	assert.Fail(application.t, "Unexpected call to Stop")
-}
-
 type dummyCustomization struct {
 	t *testing.T
 }
@@ -980,4 +1125,17 @@ type dummyTransport struct {
 func (transport *dummyTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	assert.Fail(transport.t, "Unexpected call to RoundTrip")
 	return nil, nil
+}
+
+type dummySchedule struct {
+	t            *testing.T
+	nextSchedule func() *time.Time
+}
+
+func (dummySchedule *dummySchedule) NextSchedule() *time.Time {
+	if dummySchedule.nextSchedule != nil {
+		return dummySchedule.nextSchedule()
+	}
+	assert.Fail(dummySchedule.t, "Unexpected call to NextSchedule")
+	return nil
 }

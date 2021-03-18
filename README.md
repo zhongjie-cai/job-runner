@@ -28,12 +28,24 @@ import (
 
 // This is a sample of how to setup application for a job runner
 func main() {
-	var period = time.Second * 5
+	var schedule, scheduleError = jobrunner.NewScheduleMaker().OnSeconds(
+		0, 30,
+	).OnMinutes(
+		0, 15, 30, 45,
+	).AtHours(
+		0, 6, 12, 18,
+	).OnWeekdays(
+		time.Sunday,
+	).Schedule()
+	if scheduleError != nil {
+		panic(scheduleError)
+	}
 	var application = jobrunner.NewApplication(
 		"some job runner",
 		"1.2.3",
-		3,       // this instructs the application to start 3 instances for each round of job execution, each assigned with a dedicated session and sequential index
-		&period, // this instructs the application to repeat the job execution rounds for every given period; a new round would start even if the previous round has not finished
+		3,        // this instructs the application to start 3 instances for each round of job execution, each assigned with a dedicated session and sequential index
+		schedule, // this instructs the application to repeat the job execution rounds for every given schedule
+		false,    // this instructs the application to not start a new execution if a previous one did not finish
 		&myCustomization{},
 	)
 	application.Start()

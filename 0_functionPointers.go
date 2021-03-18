@@ -31,8 +31,9 @@ var (
 	beginApplicationFunc      = beginApplication
 	logAppRootFunc            = logAppRoot
 	handleSessionFunc         = handleSession
+	waitForNextRunFunc        = waitForNextRun
 	runInstancesFunc          = runInstances
-	repeatExecutionFunc       = repeatExecution
+	scheduleExecutionFunc     = scheduleExecution
 	timeAfter                 = time.After
 	runApplicationFunc        = runApplication
 	initializeHTTPClientsFunc = initializeHTTPClients
@@ -95,6 +96,29 @@ var (
 // func pointers for injection / testing: pointerutil.go
 var (
 	reflectValueOf = reflect.ValueOf
+)
+
+// func pointers for injection / testing: schedule.go
+var (
+	timeDate                    = time.Date
+	moveValueIndexFunc          = moveValueIndex
+	getDaysOfMonthFunc          = getDaysOfMonth
+	constructTimeByScheduleFunc = constructTimeBySchedule
+	updateScheduleIndexFunc     = updateScheduleIndex
+)
+
+// func pointers for injection / testing: schedulemaker.go
+var (
+	generateFlagsDataFunc         = generateFlagsData
+	constructValueSliceFunc       = constructValueSlice
+	constructWeekdayMapFunc       = constructWeekdayMap
+	constructYearSliceFunc        = constructYearSlice
+	findValueMatchFunc            = findValueMatch
+	isWeekdayMatchFunc            = isWeekdayMatch
+	constructScheduleTemplateFunc = constructScheduleTemplate
+	determineScheduleIndexFunc    = determineScheduleIndex
+	initialiseScheduleFunc        = initialiseSchedule
+	sortInts                      = sort.Ints
 )
 
 // func pointers for injection / testing: session.go

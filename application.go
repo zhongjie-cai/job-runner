@@ -2,12 +2,11 @@ package jobrunner
 
 import (
 	"sync"
-	"time"
 )
 
 // Application is the interface for job runner application
 type Application interface {
-	// Start starts the job runner according to given specifications for number of instances (in parallel) and repeat frequency defined in application
+	// Start starts the job runner according to given specifications for number of instances (in parallel) and schedule frequency defined in application
 	Start()
 	// IsRunning returns true if the job has been successfully started and is currently running
 	IsRunning() bool
@@ -21,7 +20,7 @@ type application struct {
 	name          string
 	version       string
 	instances     int
-	repeat        *time.Duration
+	schedule      Schedule
 	overlap       bool
 	session       *session
 	customization Customization
@@ -31,14 +30,14 @@ type application struct {
 }
 
 // NewApplication creates a new application for job runner hosting
-//   instances marks how many action functions to be executed in parallel at once
-//   repeat marks how often the action functions should be repeated until stop signal is given
-//   overlap marks whether allow overlapping when a previous execution is taking longer than repeat duration
+//   instances marks how many action functions to be executed in parallel at once for a single scheduled execution
+//   schedule is a CRON schedule managing when the action functions should be executed until stop signal is given
+//   overlap marks a new execution should be executed or not when a previous execution has not yet completed
 func NewApplication(
 	name string,
 	version string,
 	instances int,
-	repeat *time.Duration,
+	schedule Schedule,
 	overlap bool,
 	customization Customization,
 ) Application {
@@ -49,7 +48,7 @@ func NewApplication(
 		name,
 		version,
 		instances,
-		repeat,
+		schedule,
 		overlap,
 		&session{
 			uuidNew(),
@@ -166,6 +165,34 @@ func postBootstraping(app *application) bool {
 	return true
 }
 
+func waitForNextRun(app *application) {
+	var timeNext = app.schedule.NextSchedule()
+	if timeNext == nil {
+		logAppRootFunc(
+			app.session,
+			"application",
+			"waitForNextRun",
+			"No next schedule available, terminating execution",
+		)
+		app.started = false
+		return
+	}
+	var waitDuration = timeNext.Sub(
+		timeNow(),
+	)
+	logAppRootFunc(
+		app.session,
+		"application",
+		"waitForNextRun",
+		"Next run at [%v]: waiting for [%v]",
+		*timeNext,
+		waitDuration,
+	)
+	<-timeAfter(
+		waitDuration,
+	)
+}
+
 func runInstances(app *application) {
 	var waitGroup sync.WaitGroup
 	for id := 0; id < app.instances; id++ {
@@ -187,8 +214,14 @@ func runInstances(app *application) {
 	waitGroup.Wait()
 }
 
-func repeatExecution(app *application) {
+func scheduleExecution(app *application) {
 	for {
+		waitForNextRunFunc(
+			app,
+		)
+		if !app.started {
+			break
+		}
 		if app.overlap {
 			go runInstancesFunc(
 				app,
@@ -198,22 +231,16 @@ func repeatExecution(app *application) {
 				app,
 			)
 		}
-		<-timeAfter(
-			*app.repeat,
-		)
-		if !app.started {
-			break
-		}
 	}
 }
 
 func runApplication(app *application) {
-	if app.repeat == nil {
+	if isInterfaceValueNilFunc(app.schedule) {
 		runInstancesFunc(
 			app,
 		)
 	} else {
-		repeatExecutionFunc(
+		scheduleExecutionFunc(
 			app,
 		)
 	}
