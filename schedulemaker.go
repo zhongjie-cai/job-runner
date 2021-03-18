@@ -21,7 +21,7 @@ type ScheduleMaker interface {
 	InYears(years ...int) ScheduleMaker
 	// From sets up the schedule maker for its start datetime; if not called or called with no parameters, then the schedule will start immediately
 	From(start time.Time) ScheduleMaker
-	// Till sets up the schedule maker for its end datetime; if not called or called with no parameters, then the schedule won't stop until its data reset
+	// Till sets up the schedule maker for its end datetime; if not called or called with no parameters, then the schedule won't stop until its data increment
 	Till(end time.Time) ScheduleMaker
 	// Done returns a compiled schedule based on all previously configured settings
 	Schedule() (Schedule, error)
@@ -247,18 +247,18 @@ func constructScheduleTemplate(scheduleMaker *scheduleMaker) *schedule {
 	return schedule
 }
 
-func findValueMatch(value int, values []int) (int, int, bool) {
+func findValueMatch(value int, values []int) (int, int, bool, bool) {
 	var count = len(values)
 	if count == 0 {
-		return 0, 0, false
+		return 0, 0, false, false
 	}
 	for index := 0; index < count; index++ {
 		if value > values[index] {
 			continue
 		}
-		return values[index], index, false
+		return values[index], index, value < values[index], false
 	}
-	return values[0], 0, true
+	return values[0], 0, true, true
 }
 
 func isWeekdayMatch(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -283,23 +283,19 @@ func determineScheduleIndex(
 	start time.Time,
 	schedule *schedule,
 ) (bool, time.Time, error) {
-	var reset bool
-	schedule.year, schedule.yearIndex, reset = findValueMatchFunc(
+	var increment bool
+	var overflow bool
+	schedule.year, schedule.yearIndex, increment, overflow = findValueMatchFunc(
 		start.Year(),
 		schedule.years,
 	)
-	if reset {
+	if overflow {
 		return false, start, fmtErrorf("Invalid schedule configuration: no valid next execution time available")
-	}
-	schedule.month, schedule.monthIndex, reset = findValueMatchFunc(
-		int(start.Month())-1,
-		schedule.months,
-	)
-	if reset {
+	} else if increment {
 		return false,
 			timeDate(
-				start.Year()+1,
-				1,
+				schedule.year,
+				time.January,
 				1,
 				0,
 				0,
@@ -309,16 +305,60 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.day, schedule.dayIndex, reset = findValueMatchFunc(
+	schedule.month, schedule.monthIndex, increment, overflow = findValueMatchFunc(
+		int(start.Month())-1,
+		schedule.months,
+	)
+	if overflow {
+		return false,
+			timeDate(
+				start.Year()+1,
+				time.January,
+				1,
+				0,
+				0,
+				0,
+				0,
+				time.Local,
+			),
+			nil
+	} else if increment {
+		return false,
+			timeDate(
+				schedule.year,
+				time.Month(schedule.month+1),
+				1,
+				0,
+				0,
+				0,
+				0,
+				time.Local,
+			),
+			nil
+	}
+	schedule.day, schedule.dayIndex, increment, overflow = findValueMatchFunc(
 		start.Day()-1,
 		schedule.days,
 	)
-	if reset {
+	if overflow {
 		return false,
 			timeDate(
 				start.Year(),
 				start.Month()+1,
 				1,
+				0,
+				0,
+				0,
+				0,
+				time.Local,
+			),
+			nil
+	} else if increment {
+		return false,
+			timeDate(
+				schedule.year,
+				time.Month(schedule.month+1),
+				schedule.day+1,
 				0,
 				0,
 				0,
@@ -346,11 +386,11 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.hour, schedule.hourIndex, reset = findValueMatchFunc(
+	schedule.hour, schedule.hourIndex, increment, overflow = findValueMatchFunc(
 		start.Hour(),
 		schedule.hours,
 	)
-	if reset {
+	if overflow {
 		return false,
 			timeDate(
 				start.Year(),
@@ -363,12 +403,25 @@ func determineScheduleIndex(
 				time.Local,
 			),
 			nil
+	} else if increment {
+		return false,
+			timeDate(
+				schedule.year,
+				time.Month(schedule.month+1),
+				schedule.day+1,
+				schedule.hour,
+				0,
+				0,
+				0,
+				time.Local,
+			),
+			nil
 	}
-	schedule.minute, schedule.minuteIndex, reset = findValueMatchFunc(
+	schedule.minute, schedule.minuteIndex, increment, overflow = findValueMatchFunc(
 		start.Minute(),
 		schedule.minutes,
 	)
-	if reset {
+	if overflow {
 		return false,
 			timeDate(
 				start.Year(),
@@ -381,12 +434,25 @@ func determineScheduleIndex(
 				time.Local,
 			),
 			nil
+	} else if increment {
+		return false,
+			timeDate(
+				schedule.year,
+				time.Month(schedule.month+1),
+				schedule.day+1,
+				schedule.hour,
+				schedule.minute,
+				0,
+				0,
+				time.Local,
+			),
+			nil
 	}
-	schedule.second, schedule.secondIndex, reset = findValueMatchFunc(
+	schedule.second, schedule.secondIndex, increment, overflow = findValueMatchFunc(
 		start.Second(),
 		schedule.seconds,
 	)
-	if reset {
+	if overflow {
 		return false,
 			timeDate(
 				start.Year(),

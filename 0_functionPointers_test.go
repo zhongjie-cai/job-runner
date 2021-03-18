@@ -520,9 +520,9 @@ func createMock(t *testing.T) {
 	}
 	findValueMatchFuncExpected = 0
 	findValueMatchFuncCalled = 0
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
-		return 0, 0, false
+		return 0, 0, false, false
 	}
 	isWeekdayMatchFuncExpected = 0
 	isWeekdayMatchFuncCalled = 0

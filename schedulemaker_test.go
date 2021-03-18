@@ -787,7 +787,7 @@ func TestFindValueMatch_EmptyValues(t *testing.T) {
 	createMock(t)
 
 	// SUT + act
-	var value, index, reset = findValueMatch(
+	var value, index, reset, overflow = findValueMatch(
 		dummyValue,
 		dummyValues,
 	)
@@ -796,6 +796,7 @@ func TestFindValueMatch_EmptyValues(t *testing.T) {
 	assert.Zero(t, value)
 	assert.Zero(t, index)
 	assert.False(t, reset)
+	assert.False(t, overflow)
 
 	// verify
 	verifyAll(t)
@@ -814,7 +815,7 @@ func TestFindValueMatch_ValidValues_NoMatch(t *testing.T) {
 	createMock(t)
 
 	// SUT + act
-	var value, index, reset = findValueMatch(
+	var value, index, reset, overflow = findValueMatch(
 		dummyValue,
 		dummyValues,
 	)
@@ -823,12 +824,44 @@ func TestFindValueMatch_ValidValues_NoMatch(t *testing.T) {
 	assert.Equal(t, dummyValues[0], value)
 	assert.Zero(t, index)
 	assert.True(t, reset)
+	assert.True(t, overflow)
 
 	// verify
 	verifyAll(t)
 }
 
-func TestFindValueMatch_ValidValues_Matched(t *testing.T) {
+func TestFindValueMatch_ValidValues_ExactMatch(t *testing.T) {
+	// arrange
+	var dummyValue = 30 + rand.Intn(10)
+	var dummyValues = []int{
+		rand.Intn(10),
+		rand.Intn(10) + 10,
+		rand.Intn(10) + 20,
+		dummyValue,
+		rand.Intn(10) + 40,
+		rand.Intn(10) + 50,
+	}
+
+	// mock
+	createMock(t)
+
+	// SUT + act
+	var value, index, reset, overflow = findValueMatch(
+		dummyValue,
+		dummyValues,
+	)
+
+	// assert
+	assert.Equal(t, dummyValues[3], value)
+	assert.Equal(t, 3, index)
+	assert.False(t, reset)
+	assert.False(t, overflow)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestFindValueMatch_ValidValues_SimMatch(t *testing.T) {
 	// arrange
 	var dummyValue = 30 + rand.Intn(10)
 	var dummyValues = []int{
@@ -843,7 +876,7 @@ func TestFindValueMatch_ValidValues_Matched(t *testing.T) {
 	createMock(t)
 
 	// SUT + act
-	var value, index, reset = findValueMatch(
+	var value, index, reset, overflow = findValueMatch(
 		dummyValue,
 		dummyValues,
 	)
@@ -851,7 +884,8 @@ func TestFindValueMatch_ValidValues_Matched(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyValues[3], value)
 	assert.Equal(t, 3, index)
-	assert.False(t, reset)
+	assert.True(t, reset)
+	assert.False(t, overflow)
 
 	// verify
 	verifyAll(t)
@@ -1019,7 +1053,7 @@ func TestIsWeekdayMatch_ValidWeekdays_FoundValid(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_YearReset(t *testing.T) {
+func TestDetermineScheduleIndex_YearOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1046,11 +1080,11 @@ func TestDetermineScheduleIndex_YearReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 1
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		assert.Equal(t, dummyStart.Year(), value)
 		assert.Equal(t, dummyYears, values)
-		return dummyYear, dummyYearIndex, true
+		return dummyYear, dummyYearIndex, false, true
 	}
 	fmtErrorfExpected = 1
 	fmtErrorf = func(format string, a ...interface{}) error {
@@ -1075,7 +1109,68 @@ func TestDetermineScheduleIndex_YearReset(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_MonthReset(t *testing.T) {
+func TestDetermineScheduleIndex_YearIncrement(t *testing.T) {
+	// arrange
+	var dummyStart = time.Now()
+	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyMinutes = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyHours = []int{rand.Intn(24), rand.Intn(24), rand.Intn(24)}
+	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
+	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
+	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummySchedule = &schedule{
+		seconds: dummySeconds,
+		minutes: dummyMinutes,
+		hours:   dummyHours,
+		days:    dummyDays,
+		months:  dummyMonths,
+		years:   dummyYears,
+	}
+	var dummyYear = rand.Intn(100)
+	var dummyYearIndex = rand.Intn(100)
+	var dummyTime = time.Now().Add(10 * time.Second)
+
+	// mock
+	createMock(t)
+
+	// expect
+	findValueMatchFuncExpected = 1
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		assert.Equal(t, dummyStart.Year(), value)
+		assert.Equal(t, dummyYears, values)
+		return dummyYear, dummyYearIndex, true, false
+	}
+	timeDateExpected = 1
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, time.January, month)
+		assert.Equal(t, 1, day)
+		assert.Zero(t, hour)
+		assert.Zero(t, min)
+		assert.Zero(t, sec)
+		assert.Zero(t, nsec)
+		assert.Equal(t, time.Local, loc)
+		return dummyTime
+	}
+
+	// SUT + act
+	var completed, start, err = determineScheduleIndex(
+		dummyStart,
+		dummySchedule,
+	)
+
+	// assert
+	assert.False(t, completed)
+	assert.Equal(t, dummyTime, start)
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDetermineScheduleIndex_MonthOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1103,16 +1198,16 @@ func TestDetermineScheduleIndex_MonthReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 2
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		}
 		assert.Equal(t, int(dummyStart.Month())-1, value)
 		assert.Equal(t, dummyMonths, values)
-		return dummyMonth, dummyMonthIndex, true
+		return dummyMonth, dummyMonthIndex, false, true
 	}
 	timeDateExpected = 1
 	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
@@ -1143,7 +1238,75 @@ func TestDetermineScheduleIndex_MonthReset(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_DayReset(t *testing.T) {
+func TestDetermineScheduleIndex_MonthIncrement(t *testing.T) {
+	// arrange
+	var dummyStart = time.Now()
+	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyMinutes = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyHours = []int{rand.Intn(24), rand.Intn(24), rand.Intn(24)}
+	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
+	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
+	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummySchedule = &schedule{
+		seconds: dummySeconds,
+		minutes: dummyMinutes,
+		hours:   dummyHours,
+		days:    dummyDays,
+		months:  dummyMonths,
+		years:   dummyYears,
+	}
+	var dummyYear = rand.Intn(100)
+	var dummyYearIndex = rand.Intn(100)
+	var dummyMonth = rand.Intn(12)
+	var dummyMonthIndex = rand.Intn(12)
+	var dummyTime = time.Now().Add(10 * time.Second)
+
+	// mock
+	createMock(t)
+
+	// expect
+	findValueMatchFuncExpected = 2
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		if findValueMatchFuncCalled == 1 {
+			assert.Equal(t, dummyStart.Year(), value)
+			assert.Equal(t, dummyYears, values)
+			return dummyYear, dummyYearIndex, false, false
+		}
+		assert.Equal(t, int(dummyStart.Month())-1, value)
+		assert.Equal(t, dummyMonths, values)
+		return dummyMonth, dummyMonthIndex, true, false
+	}
+	timeDateExpected = 1
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, time.Month(dummyMonth+1), month)
+		assert.Equal(t, 1, day)
+		assert.Zero(t, hour)
+		assert.Zero(t, min)
+		assert.Zero(t, sec)
+		assert.Zero(t, nsec)
+		assert.Equal(t, time.Local, loc)
+		return dummyTime
+	}
+
+	// SUT + act
+	var completed, start, err = determineScheduleIndex(
+		dummyStart,
+		dummySchedule,
+	)
+
+	// assert
+	assert.False(t, completed)
+	assert.Equal(t, dummyTime, start)
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDetermineScheduleIndex_DayOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1173,20 +1336,20 @@ func TestDetermineScheduleIndex_DayReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 3
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Day()-1, value)
 		assert.Equal(t, dummyDays, values)
-		return dummyDay, dummyDayIndex, true
+		return dummyDay, dummyDayIndex, false, true
 	}
 	timeDateExpected = 1
 	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
@@ -1194,6 +1357,80 @@ func TestDetermineScheduleIndex_DayReset(t *testing.T) {
 		assert.Equal(t, dummyStart.Year(), year)
 		assert.Equal(t, dummyStart.Month()+1, month)
 		assert.Equal(t, 1, day)
+		assert.Zero(t, hour)
+		assert.Zero(t, min)
+		assert.Zero(t, sec)
+		assert.Zero(t, nsec)
+		assert.Equal(t, time.Local, loc)
+		return dummyTime
+	}
+
+	// SUT + act
+	var completed, start, err = determineScheduleIndex(
+		dummyStart,
+		dummySchedule,
+	)
+
+	// assert
+	assert.False(t, completed)
+	assert.Equal(t, dummyTime, start)
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDetermineScheduleIndex_DayIncrement(t *testing.T) {
+	// arrange
+	var dummyStart = time.Now()
+	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyMinutes = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyHours = []int{rand.Intn(24), rand.Intn(24), rand.Intn(24)}
+	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
+	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
+	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummySchedule = &schedule{
+		seconds: dummySeconds,
+		minutes: dummyMinutes,
+		hours:   dummyHours,
+		days:    dummyDays,
+		months:  dummyMonths,
+		years:   dummyYears,
+	}
+	var dummyYear = rand.Intn(100)
+	var dummyYearIndex = rand.Intn(100)
+	var dummyMonth = rand.Intn(12)
+	var dummyMonthIndex = rand.Intn(12)
+	var dummyDay = rand.Intn(31)
+	var dummyDayIndex = rand.Intn(31)
+	var dummyTime = time.Now().Add(10 * time.Second)
+
+	// mock
+	createMock(t)
+
+	// expect
+	findValueMatchFuncExpected = 3
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		if findValueMatchFuncCalled == 1 {
+			assert.Equal(t, dummyStart.Year(), value)
+			assert.Equal(t, dummyYears, values)
+			return dummyYear, dummyYearIndex, false, false
+		} else if findValueMatchFuncCalled == 2 {
+			assert.Equal(t, int(dummyStart.Month())-1, value)
+			assert.Equal(t, dummyMonths, values)
+			return dummyMonth, dummyMonthIndex, false, false
+		}
+		assert.Equal(t, dummyStart.Day()-1, value)
+		assert.Equal(t, dummyDays, values)
+		return dummyDay, dummyDayIndex, true, false
+	}
+	timeDateExpected = 1
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, time.Month(dummyMonth+1), month)
+		assert.Equal(t, dummyDay+1, day)
 		assert.Zero(t, hour)
 		assert.Zero(t, min)
 		assert.Zero(t, sec)
@@ -1253,20 +1490,20 @@ func TestDetermineScheduleIndex_WeekdayMismatch(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 3
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Day()-1, value)
 		assert.Equal(t, dummyDays, values)
-		return dummyDay, dummyDayIndex, false
+		return dummyDay, dummyDayIndex, false, false
 	}
 	isWeekdayMatchFuncExpected = 1
 	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -1306,7 +1543,7 @@ func TestDetermineScheduleIndex_WeekdayMismatch(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_HourReset(t *testing.T) {
+func TestDetermineScheduleIndex_HourOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1344,24 +1581,24 @@ func TestDetermineScheduleIndex_HourReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 4
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		} else if findValueMatchFuncCalled == 3 {
 			assert.Equal(t, dummyStart.Day()-1, value)
 			assert.Equal(t, dummyDays, values)
-			return dummyDay, dummyDayIndex, false
+			return dummyDay, dummyDayIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Hour(), value)
 		assert.Equal(t, dummyHours, values)
-		return dummyHour, dummyHourIndex, true
+		return dummyHour, dummyHourIndex, false, true
 	}
 	isWeekdayMatchFuncExpected = 1
 	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -1401,7 +1638,102 @@ func TestDetermineScheduleIndex_HourReset(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_MinuteReset(t *testing.T) {
+func TestDetermineScheduleIndex_HourIncrement(t *testing.T) {
+	// arrange
+	var dummyStart = time.Now()
+	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyMinutes = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyHours = []int{rand.Intn(24), rand.Intn(24), rand.Intn(24)}
+	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
+	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
+	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyWeekdays = map[time.Weekday]bool{
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+	}
+	var dummySchedule = &schedule{
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		weekdays: dummyWeekdays,
+	}
+	var dummyYear = rand.Intn(100)
+	var dummyYearIndex = rand.Intn(100)
+	var dummyMonth = rand.Intn(12)
+	var dummyMonthIndex = rand.Intn(12)
+	var dummyDay = rand.Intn(31)
+	var dummyDayIndex = rand.Intn(31)
+	var dummyHour = rand.Intn(24)
+	var dummyHourIndex = rand.Intn(24)
+	var dummyTime = time.Now().Add(10 * time.Second)
+
+	// mock
+	createMock(t)
+
+	// expect
+	findValueMatchFuncExpected = 4
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		if findValueMatchFuncCalled == 1 {
+			assert.Equal(t, dummyStart.Year(), value)
+			assert.Equal(t, dummyYears, values)
+			return dummyYear, dummyYearIndex, false, false
+		} else if findValueMatchFuncCalled == 2 {
+			assert.Equal(t, int(dummyStart.Month())-1, value)
+			assert.Equal(t, dummyMonths, values)
+			return dummyMonth, dummyMonthIndex, false, false
+		} else if findValueMatchFuncCalled == 3 {
+			assert.Equal(t, dummyStart.Day()-1, value)
+			assert.Equal(t, dummyDays, values)
+			return dummyDay, dummyDayIndex, false, false
+		}
+		assert.Equal(t, dummyStart.Hour(), value)
+		assert.Equal(t, dummyHours, values)
+		return dummyHour, dummyHourIndex, true, false
+	}
+	isWeekdayMatchFuncExpected = 1
+	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
+		isWeekdayMatchFuncCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, dummyMonth, month)
+		assert.Equal(t, dummyDay, day)
+		assert.Equal(t, dummyWeekdays, weekdays)
+		return true
+	}
+	timeDateExpected = 1
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, time.Month(dummyMonth+1), month)
+		assert.Equal(t, dummyDay+1, day)
+		assert.Equal(t, dummyHour, hour)
+		assert.Zero(t, min)
+		assert.Zero(t, sec)
+		assert.Zero(t, nsec)
+		assert.Equal(t, time.Local, loc)
+		return dummyTime
+	}
+
+	// SUT + act
+	var completed, start, err = determineScheduleIndex(
+		dummyStart,
+		dummySchedule,
+	)
+
+	// assert
+	assert.False(t, completed)
+	assert.Equal(t, dummyTime, start)
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDetermineScheduleIndex_MinuteOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1441,28 +1773,28 @@ func TestDetermineScheduleIndex_MinuteReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 5
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		} else if findValueMatchFuncCalled == 3 {
 			assert.Equal(t, dummyStart.Day()-1, value)
 			assert.Equal(t, dummyDays, values)
-			return dummyDay, dummyDayIndex, false
+			return dummyDay, dummyDayIndex, false, false
 		} else if findValueMatchFuncCalled == 4 {
 			assert.Equal(t, dummyStart.Hour(), value)
 			assert.Equal(t, dummyHours, values)
-			return dummyHour, dummyHourIndex, false
+			return dummyHour, dummyHourIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Minute(), value)
 		assert.Equal(t, dummyMinutes, values)
-		return dummyMinute, dummyMinuteIndex, true
+		return dummyMinute, dummyMinuteIndex, false, true
 	}
 	isWeekdayMatchFuncExpected = 1
 	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -1502,7 +1834,108 @@ func TestDetermineScheduleIndex_MinuteReset(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_SecondReset(t *testing.T) {
+func TestDetermineScheduleIndex_MinuteIncrement(t *testing.T) {
+	// arrange
+	var dummyStart = time.Now()
+	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyMinutes = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
+	var dummyHours = []int{rand.Intn(24), rand.Intn(24), rand.Intn(24)}
+	var dummyDays = []int{rand.Intn(31), rand.Intn(31), rand.Intn(31)}
+	var dummyMonths = []int{rand.Intn(12), rand.Intn(12), rand.Intn(12)}
+	var dummyYears = []int{rand.Intn(100), rand.Intn(100), rand.Intn(100)}
+	var dummyWeekdays = map[time.Weekday]bool{
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+		time.Weekday(rand.Intn(7)): rand.Intn(100) > 50,
+	}
+	var dummySchedule = &schedule{
+		seconds:  dummySeconds,
+		minutes:  dummyMinutes,
+		hours:    dummyHours,
+		days:     dummyDays,
+		months:   dummyMonths,
+		years:    dummyYears,
+		weekdays: dummyWeekdays,
+	}
+	var dummyYear = rand.Intn(100)
+	var dummyYearIndex = rand.Intn(100)
+	var dummyMonth = rand.Intn(12)
+	var dummyMonthIndex = rand.Intn(12)
+	var dummyDay = rand.Intn(31)
+	var dummyDayIndex = rand.Intn(31)
+	var dummyHour = rand.Intn(24)
+	var dummyHourIndex = rand.Intn(24)
+	var dummyMinute = rand.Intn(60)
+	var dummyMinuteIndex = rand.Intn(60)
+	var dummyTime = time.Now().Add(10 * time.Second)
+
+	// mock
+	createMock(t)
+
+	// expect
+	findValueMatchFuncExpected = 5
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
+		findValueMatchFuncCalled++
+		if findValueMatchFuncCalled == 1 {
+			assert.Equal(t, dummyStart.Year(), value)
+			assert.Equal(t, dummyYears, values)
+			return dummyYear, dummyYearIndex, false, false
+		} else if findValueMatchFuncCalled == 2 {
+			assert.Equal(t, int(dummyStart.Month())-1, value)
+			assert.Equal(t, dummyMonths, values)
+			return dummyMonth, dummyMonthIndex, false, false
+		} else if findValueMatchFuncCalled == 3 {
+			assert.Equal(t, dummyStart.Day()-1, value)
+			assert.Equal(t, dummyDays, values)
+			return dummyDay, dummyDayIndex, false, false
+		} else if findValueMatchFuncCalled == 4 {
+			assert.Equal(t, dummyStart.Hour(), value)
+			assert.Equal(t, dummyHours, values)
+			return dummyHour, dummyHourIndex, false, false
+		}
+		assert.Equal(t, dummyStart.Minute(), value)
+		assert.Equal(t, dummyMinutes, values)
+		return dummyMinute, dummyMinuteIndex, true, false
+	}
+	isWeekdayMatchFuncExpected = 1
+	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
+		isWeekdayMatchFuncCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, dummyMonth, month)
+		assert.Equal(t, dummyDay, day)
+		assert.Equal(t, dummyWeekdays, weekdays)
+		return true
+	}
+	timeDateExpected = 1
+	timeDate = func(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.Location) time.Time {
+		timeDateCalled++
+		assert.Equal(t, dummyYear, year)
+		assert.Equal(t, time.Month(dummyMonth+1), month)
+		assert.Equal(t, dummyDay+1, day)
+		assert.Equal(t, dummyHour, hour)
+		assert.Equal(t, dummyMinute, min)
+		assert.Zero(t, sec)
+		assert.Zero(t, nsec)
+		assert.Equal(t, time.Local, loc)
+		return dummyTime
+	}
+
+	// SUT + act
+	var completed, start, err = determineScheduleIndex(
+		dummyStart,
+		dummySchedule,
+	)
+
+	// assert
+	assert.False(t, completed)
+	assert.Equal(t, dummyTime, start)
+	assert.NoError(t, err)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestDetermineScheduleIndex_SecondOverflow(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1544,32 +1977,32 @@ func TestDetermineScheduleIndex_SecondReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 6
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		} else if findValueMatchFuncCalled == 3 {
 			assert.Equal(t, dummyStart.Day()-1, value)
 			assert.Equal(t, dummyDays, values)
-			return dummyDay, dummyDayIndex, false
+			return dummyDay, dummyDayIndex, false, false
 		} else if findValueMatchFuncCalled == 4 {
 			assert.Equal(t, dummyStart.Hour(), value)
 			assert.Equal(t, dummyHours, values)
-			return dummyHour, dummyHourIndex, false
+			return dummyHour, dummyHourIndex, false, false
 		} else if findValueMatchFuncCalled == 5 {
 			assert.Equal(t, dummyStart.Minute(), value)
 			assert.Equal(t, dummyMinutes, values)
-			return dummyMinute, dummyMinuteIndex, false
+			return dummyMinute, dummyMinuteIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Second(), value)
 		assert.Equal(t, dummySeconds, values)
-		return dummySecond, dummySecondIndex, true
+		return dummySecond, dummySecondIndex, false, true
 	}
 	isWeekdayMatchFuncExpected = 1
 	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -1609,7 +2042,7 @@ func TestDetermineScheduleIndex_SecondReset(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestDetermineScheduleIndex_NoReset(t *testing.T) {
+func TestDetermineScheduleIndex_NoOverflow_NoIncrement(t *testing.T) {
 	// arrange
 	var dummyStart = time.Now()
 	var dummySeconds = []int{rand.Intn(60), rand.Intn(60), rand.Intn(60)}
@@ -1650,32 +2083,32 @@ func TestDetermineScheduleIndex_NoReset(t *testing.T) {
 
 	// expect
 	findValueMatchFuncExpected = 6
-	findValueMatchFunc = func(value int, values []int) (int, int, bool) {
+	findValueMatchFunc = func(value int, values []int) (int, int, bool, bool) {
 		findValueMatchFuncCalled++
 		if findValueMatchFuncCalled == 1 {
 			assert.Equal(t, dummyStart.Year(), value)
 			assert.Equal(t, dummyYears, values)
-			return dummyYear, dummyYearIndex, false
+			return dummyYear, dummyYearIndex, false, false
 		} else if findValueMatchFuncCalled == 2 {
 			assert.Equal(t, int(dummyStart.Month())-1, value)
 			assert.Equal(t, dummyMonths, values)
-			return dummyMonth, dummyMonthIndex, false
+			return dummyMonth, dummyMonthIndex, false, false
 		} else if findValueMatchFuncCalled == 3 {
 			assert.Equal(t, dummyStart.Day()-1, value)
 			assert.Equal(t, dummyDays, values)
-			return dummyDay, dummyDayIndex, false
+			return dummyDay, dummyDayIndex, false, false
 		} else if findValueMatchFuncCalled == 4 {
 			assert.Equal(t, dummyStart.Hour(), value)
 			assert.Equal(t, dummyHours, values)
-			return dummyHour, dummyHourIndex, false
+			return dummyHour, dummyHourIndex, false, false
 		} else if findValueMatchFuncCalled == 5 {
 			assert.Equal(t, dummyStart.Minute(), value)
 			assert.Equal(t, dummyMinutes, values)
-			return dummyMinute, dummyMinuteIndex, false
+			return dummyMinute, dummyMinuteIndex, false, false
 		}
 		assert.Equal(t, dummyStart.Second(), value)
 		assert.Equal(t, dummySeconds, values)
-		return dummySecond, dummySecondIndex, false
+		return dummySecond, dummySecondIndex, false, false
 	}
 	isWeekdayMatchFuncExpected = 1
 	isWeekdayMatchFunc = func(year, month, day int, weekdays map[time.Weekday]bool) bool {
@@ -1857,4 +2290,59 @@ func TestScheduleMaker_Schedule_WithFrom(t *testing.T) {
 
 	// verify
 	verifyAll(t)
+}
+
+func TestScheduleMaker_Integration(t *testing.T) {
+	// setup
+	const layout = "2006-01-02 15:04:05"
+	var testData = map[string]string{
+		"2001-02-03 04:05:06": "2001-04-01 00:00:00",
+		"2001-04-15 03:06:09": "2001-04-15 04:00:00",
+		"2001-04-15 06:30:55": "2001-04-15 06:35:00",
+		"2001-10-15 22:55:35": "2002-01-01 00:00:00",
+		"2001-10-16 22:55:35": "2002-01-01 00:00:00",
+		"2001-04-16 22:55:35": "2001-07-01 00:00:00",
+		"2001-12-03 04:05:06": "2002-01-01 00:00:00",
+		"2001-10-15 22:55:31": "2002-01-01 00:00:00",
+		"2001-10-15 22:55:29": "2001-10-15 22:55:30",
+		"2001-10-15 23:55:30": "2002-01-01 00:00:00",
+	}
+
+	for given, expect := range testData {
+		// arrange
+		var timeStart, _ = time.Parse(layout, given)
+		var timeExpect, _ = time.Parse(layout, expect)
+
+		// stub
+		timeNow = func() time.Time {
+			return timeStart
+		}
+
+		// SUT
+		var scheduleMaker, _ = NewScheduleMaker().OnSeconds(
+			0, 30,
+		).OnMinutes(
+			0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55,
+		).AtHours(
+			0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22,
+		).OnDays(
+			1, 15,
+		).InMonths(
+			time.January, time.April, time.July, time.October,
+		).InYears(
+			2000, 2001, 2002,
+		).Schedule()
+
+		// act
+		var timeNext = scheduleMaker.NextSchedule()
+
+		// assert
+		assert.NotNil(t, timeNext)
+		assert.Equal(t, timeExpect.Year(), timeNext.Year())
+		assert.Equal(t, timeExpect.Month(), timeNext.Month())
+		assert.Equal(t, timeExpect.Day(), timeNext.Day())
+		assert.Equal(t, timeExpect.Hour(), timeNext.Hour())
+		assert.Equal(t, timeExpect.Minute(), timeNext.Minute())
+		assert.Equal(t, timeExpect.Second(), timeNext.Second())
+	}
 }
