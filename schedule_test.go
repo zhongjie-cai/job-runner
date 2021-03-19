@@ -860,14 +860,9 @@ func TestNextSchedule_ExceededTillTime(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestNextSchedule_NextTimeInPast(t *testing.T) {
+func TestNextSchedule_AlreadyCompleted(t *testing.T) {
 	// arrange
 	var dummyCurrentLocalTime = time.Now()
-	var dummyTill = dummyCurrentLocalTime.Add(1 * time.Second)
-	var dummySchedule = &schedule{
-		till: &dummyTill,
-	}
-	var dummyTimeNext = dummyCurrentLocalTime.Add(-1 * time.Second)
 
 	// mock
 	createMock(t)
@@ -878,15 +873,11 @@ func TestNextSchedule_NextTimeInPast(t *testing.T) {
 		timeNowCalled++
 		return dummyCurrentLocalTime
 	}
-	constructTimeByScheduleFuncExpected = 1
-	constructTimeByScheduleFunc = func(schedule *schedule) time.Time {
-		constructTimeByScheduleFuncCalled++
-		assert.Equal(t, dummySchedule, schedule)
-		return dummyTimeNext
-	}
 
 	// SUT
-	var sut = dummySchedule
+	var sut = &schedule{
+		completed: true,
+	}
 
 	// act
 	var result = sut.NextSchedule()
@@ -898,14 +889,12 @@ func TestNextSchedule_NextTimeInPast(t *testing.T) {
 	verifyAll(t)
 }
 
-func TestNextSchedule_HappyPath(t *testing.T) {
+func TestNextSchedule_NextInFuture(t *testing.T) {
 	// arrange
 	var dummyCurrentLocalTime = time.Now()
-	var dummyTill = dummyCurrentLocalTime.Add(2 * time.Second)
-	var dummySchedule = &schedule{
-		till: &dummyTill,
-	}
+	var dummySchedule = &schedule{}
 	var dummyTimeNext = dummyCurrentLocalTime.Add(1 * time.Second)
+	var dummyCompleted = rand.Intn(100) > 50
 
 	// mock
 	createMock(t)
@@ -923,9 +912,10 @@ func TestNextSchedule_HappyPath(t *testing.T) {
 		return dummyTimeNext
 	}
 	updateScheduleIndexFuncExpected = 1
-	updateScheduleIndexFunc = func(schedule *schedule) {
+	updateScheduleIndexFunc = func(schedule *schedule) bool {
 		updateScheduleIndexFuncCalled++
 		assert.Equal(t, dummySchedule, schedule)
+		return dummyCompleted
 	}
 
 	// SUT
@@ -936,6 +926,148 @@ func TestNextSchedule_HappyPath(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyTimeNext, *result)
+	assert.Equal(t, dummyCompleted, dummySchedule.completed)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestNextSchedule_NextInPast_NoSkipOverdue(t *testing.T) {
+	// arrange
+	var dummyCurrentLocalTime = time.Now()
+	var dummySchedule = &schedule{
+		skipOverdue: false,
+	}
+	var dummyTimeNext = dummyCurrentLocalTime.Add(-1 * time.Second)
+	var dummyCompleted = rand.Intn(100) > 50
+
+	// mock
+	createMock(t)
+
+	// expect
+	timeNowExpected = 1
+	timeNow = func() time.Time {
+		timeNowCalled++
+		return dummyCurrentLocalTime
+	}
+	constructTimeByScheduleFuncExpected = 1
+	constructTimeByScheduleFunc = func(schedule *schedule) time.Time {
+		constructTimeByScheduleFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		return dummyTimeNext
+	}
+	updateScheduleIndexFuncExpected = 1
+	updateScheduleIndexFunc = func(schedule *schedule) bool {
+		updateScheduleIndexFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		return dummyCompleted
+	}
+
+	// SUT
+	var sut = dummySchedule
+
+	// act
+	var result = sut.NextSchedule()
+
+	// assert
+	assert.Equal(t, dummyTimeNext, *result)
+	assert.Equal(t, dummyCompleted, dummySchedule.completed)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestNextSchedule_NextInPast_SkipOverdue_Completed(t *testing.T) {
+	// arrange
+	var dummyCurrentLocalTime = time.Now()
+	var dummySchedule = &schedule{
+		skipOverdue: true,
+	}
+	var dummyTimeNext = dummyCurrentLocalTime.Add(-1 * time.Second)
+	var dummyCompleted = true
+
+	// mock
+	createMock(t)
+
+	// expect
+	timeNowExpected = 1
+	timeNow = func() time.Time {
+		timeNowCalled++
+		return dummyCurrentLocalTime
+	}
+	constructTimeByScheduleFuncExpected = 1
+	constructTimeByScheduleFunc = func(schedule *schedule) time.Time {
+		constructTimeByScheduleFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		return dummyTimeNext
+	}
+	updateScheduleIndexFuncExpected = 1
+	updateScheduleIndexFunc = func(schedule *schedule) bool {
+		updateScheduleIndexFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		return dummyCompleted
+	}
+
+	// SUT
+	var sut = dummySchedule
+
+	// act
+	var result = sut.NextSchedule()
+
+	// assert
+	assert.Nil(t, result)
+	assert.True(t, dummySchedule.completed)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestNextSchedule_NextInPast_SkipOverdue_NotCompleted(t *testing.T) {
+	// arrange
+	var dummyCurrentLocalTime = time.Now()
+	var dummySchedule = &schedule{
+		skipOverdue: true,
+	}
+	var dummyTimeNextInPast = dummyCurrentLocalTime.Add(-1 * time.Second)
+	var dummyTimeNextInFuture = dummyCurrentLocalTime.Add(1 * time.Second)
+	var dummyCompleted = false
+
+	// mock
+	createMock(t)
+
+	// expect
+	timeNowExpected = 1
+	timeNow = func() time.Time {
+		timeNowCalled++
+		return dummyCurrentLocalTime
+	}
+	constructTimeByScheduleFuncExpected = 2
+	constructTimeByScheduleFunc = func(schedule *schedule) time.Time {
+		constructTimeByScheduleFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		if constructTimeByScheduleFuncCalled == 1 {
+			return dummyTimeNextInPast
+		} else if constructTimeByScheduleFuncCalled == 2 {
+			return dummyTimeNextInFuture
+		}
+		return time.Time{}
+	}
+	updateScheduleIndexFuncExpected = 2
+	updateScheduleIndexFunc = func(schedule *schedule) bool {
+		updateScheduleIndexFuncCalled++
+		assert.Equal(t, dummySchedule, schedule)
+		return dummyCompleted
+	}
+
+	// SUT
+	var sut = dummySchedule
+
+	// act
+	var result = sut.NextSchedule()
+
+	// assert
+	assert.Equal(t, dummyTimeNextInFuture, *result)
+	assert.False(t, dummySchedule.completed)
 
 	// verify
 	verifyAll(t)

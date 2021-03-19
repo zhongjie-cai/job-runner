@@ -491,8 +491,9 @@ func createMock(t *testing.T) {
 	}
 	updateScheduleIndexFuncExpected = 0
 	updateScheduleIndexFuncCalled = 0
-	updateScheduleIndexFunc = func(schedule *schedule) {
+	updateScheduleIndexFunc = func(schedule *schedule) bool {
 		updateScheduleIndexFuncCalled++
+		return false
 	}
 	generateFlagsDataFuncExpected = 0
 	generateFlagsDataFuncCalled = 0

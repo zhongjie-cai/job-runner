@@ -32,6 +32,8 @@ type schedule struct {
 	weekdays    map[time.Weekday]bool
 	till        *time.Time
 	timezone    *time.Location
+	skipOverdue bool
+	completed   bool
 }
 
 func moveValueIndex(
@@ -75,7 +77,7 @@ func constructTimeBySchedule(schedule *schedule) time.Time {
 
 func updateScheduleIndex(
 	schedule *schedule,
-) {
+) bool {
 	var reset bool
 	// get next second from schedule data
 	schedule.second, schedule.secondIndex, reset = moveValueIndexFunc(
@@ -116,16 +118,19 @@ func updateScheduleIndex(
 					)
 					if reset {
 						// month reset, thus get next year from schedule data
-						schedule.year, schedule.yearIndex, _ = moveValueIndexFunc(
+						schedule.year, schedule.yearIndex, reset = moveValueIndexFunc(
 							schedule.yearIndex,
 							schedule.years,
 							9999, // hopefully nobody is still using this library by year 9999?
 						)
+						// reset on year means the whole schedule rotated to its beginning, thus meaning the schedule is completed
+						return reset
 					}
 				}
 			}
 		}
 	}
+	return false
 }
 
 func (schedule *schedule) NextSchedule() *time.Time {
@@ -135,16 +140,23 @@ func (schedule *schedule) NextSchedule() *time.Time {
 		// causes the schedule to terminate
 		return nil
 	}
-	// load next schedule time
-	var timeNext = constructTimeByScheduleFunc(
-		schedule,
-	)
-	if timeNext.Before(currentLocalTime) {
-		// in past means schedule has been reset, so no longer runnable
-		return nil
+	for {
+		if schedule.completed {
+			// causes the schedule to terminate
+			return nil
+		}
+		// load next schedule time
+		var timeNext = constructTimeByScheduleFunc(
+			schedule,
+		)
+		schedule.completed = updateScheduleIndexFunc(
+			schedule,
+		)
+		if currentLocalTime.Before(timeNext) {
+			return &timeNext
+		}
+		if !schedule.skipOverdue {
+			return &timeNext
+		}
 	}
-	updateScheduleIndexFunc(
-		schedule,
-	)
-	return &timeNext
 }
