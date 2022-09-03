@@ -2,6 +2,7 @@ package jobrunner
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 // Application is the interface for job runner application
@@ -20,6 +21,7 @@ type application struct {
 	name          string
 	version       string
 	instances     int
+	reruns        []int32
 	schedule      Schedule
 	overlap       bool
 	session       *session
@@ -27,6 +29,7 @@ type application struct {
 	shutdown      chan bool
 	started       bool
 	lastErrors    []error
+	waits         sync.WaitGroup
 }
 
 // NewApplication creates a new application for job runner hosting
@@ -45,21 +48,23 @@ func NewApplication(
 		customization = customizationDefault
 	}
 	var application = &application{
-		name,
-		version,
-		instances,
-		schedule,
-		overlap,
-		&session{
-			uuidNew(),
-			0,
-			map[string]interface{}{},
-			customization,
+		name:      name,
+		version:   version,
+		instances: instances,
+		reruns:    make([]int32, instances),
+		schedule:  schedule,
+		overlap:   overlap,
+		session: &session{
+			id:            uuidNew(),
+			index:         0,
+			attachment:    map[string]interface{}{},
+			customization: customization,
 		},
-		customization,
-		make(chan bool),
-		false,
-		[]error{},
+		customization: customization,
+		shutdown:      make(chan bool),
+		started:       false,
+		lastErrors:    []error{},
+		waits:         sync.WaitGroup{},
 	}
 	return application
 }
@@ -197,10 +202,12 @@ func runInstances(app *application) {
 	var waitGroup sync.WaitGroup
 	for id := 0; id < app.instances; id++ {
 		waitGroup.Add(1)
-		go func(index int) {
+		atomic.AddInt32(&app.reruns[id], 1)
+		go func(index int, reruns int) {
 			var sessionError = handleSessionFunc(
 				app,
 				index,
+				reruns,
 			)
 			if sessionError != nil {
 				app.lastErrors = append(
@@ -209,9 +216,12 @@ func runInstances(app *application) {
 				)
 			}
 			waitGroup.Done()
-		}(id)
+		}(id, int(app.reruns[id]))
 	}
 	waitGroup.Wait()
+	if app.overlap {
+		app.waits.Done()
+	}
 }
 
 func scheduleExecution(app *application) {
@@ -223,6 +233,7 @@ func scheduleExecution(app *application) {
 			break
 		}
 		if app.overlap {
+			app.waits.Add(1)
 			go runInstancesFunc(
 				app,
 			)
@@ -231,6 +242,9 @@ func scheduleExecution(app *application) {
 				app,
 			)
 		}
+	}
+	if app.overlap {
+		app.waits.Wait()
 	}
 }
 

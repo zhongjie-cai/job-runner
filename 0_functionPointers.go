@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"regexp"
 	"runtime"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,7 +42,6 @@ var (
 	fmtPrintf              = fmt.Printf
 	fmtSprintf             = fmt.Sprintf
 	marshalIgnoreErrorFunc = marshalIgnoreError
-	debugStack             = debug.Stack
 )
 
 // func pointers for injection / testing: handler.go
@@ -86,11 +83,6 @@ var (
 var (
 	sortStrings = sort.Strings
 	stringsJoin = strings.Join
-)
-
-// func pointers for injection / testing: parameter.go
-var (
-	regexpMatchString = regexp.MatchString
 )
 
 // func pointers for injection / testing: pointerutil.go

@@ -19,6 +19,9 @@ type SessionMeta interface {
 
 	// GetIndex returns the instance index registered to session object for given session ID
 	GetIndex() int
+
+	// GetReruns returns the rerun count for the same instance since first scheduled
+	GetReruns() int
 }
 
 // SessionAttachment is a subset of Session interface, containing only attachment related methods
@@ -63,6 +66,7 @@ type SessionWebcall interface {
 type session struct {
 	id            uuid.UUID
 	index         int
+	reruns        int
 	attachment    map[string]interface{}
 	customization Customization
 }
@@ -81,6 +85,14 @@ func (session *session) GetIndex() int {
 		return 0
 	}
 	return session.index
+}
+
+// GetReruns returns the rerun count for the same instance since first scheduled
+func (session *session) GetReruns() int {
+	if session == nil {
+		return 0
+	}
+	return session.reruns
 }
 
 // Attach attaches any value object into the given session associated to the session ID

@@ -17,7 +17,7 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyVersion = "some version"
-	var dummyInstances = rand.Int()
+	var dummyInstances = rand.Intn(100)
 	var dummySchedule Schedule
 	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization Customization
@@ -75,7 +75,7 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyVersion = "some version"
-	var dummyInstances = rand.Int()
+	var dummyInstances = rand.Intn(100)
 	var dummySchedule Schedule
 	var dummyOverlap = rand.Intn(100) > 50
 	var dummyCustomization = &dummyCustomization{t: t}
@@ -834,8 +834,10 @@ func TestRunInstances_ZeroInstance(t *testing.T) {
 
 func TestRunInstances_SingleInstance(t *testing.T) {
 	// arrange
+	var dummyReruns = rand.Int31n(65535)
 	var dummyApplication = &application{
 		instances: 1,
+		reruns:    []int32{dummyReruns},
 	}
 	var dummyError = errors.New("some error")
 
@@ -844,10 +846,11 @@ func TestRunInstances_SingleInstance(t *testing.T) {
 
 	// expect
 	handleSessionFuncExpected = 1
-	handleSessionFunc = func(app *application, index int) error {
+	handleSessionFunc = func(app *application, index int, reruns int) error {
 		handleSessionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 		assert.Equal(t, 0, index)
+		assert.Equal(t, int(dummyReruns)+1, reruns)
 		return dummyError
 	}
 
@@ -873,6 +876,7 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	}
 	var dummyApplication = &application{
 		instances: len(dummyErrors),
+		reruns:    make([]int32, len(dummyErrors)),
 	}
 	var expectedIndex = map[int]bool{}
 	var writeLock sync.Mutex
@@ -882,7 +886,7 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 
 	// expect
 	handleSessionFuncExpected = dummyApplication.instances
-	handleSessionFunc = func(app *application, index int) error {
+	handleSessionFunc = func(app *application, index int, reruns int) error {
 		handleSessionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 		writeLock.Lock()
@@ -903,6 +907,45 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	assert.True(t, expectedIndex[2])
 	assert.Equal(t, dummyApplication.instances, len(dummyApplication.lastErrors))
 	assert.ElementsMatch(t, dummyErrors, dummyApplication.lastErrors)
+
+	// verify
+	verifyAll(t)
+}
+
+func TestRunInstances_Overlap(t *testing.T) {
+	// arrange
+	var dummyReruns = rand.Int31n(65535)
+	var dummyApplication = &application{
+		instances: 1,
+		reruns:    []int32{dummyReruns},
+		overlap:   true,
+	}
+	var dummyError = errors.New("some error")
+
+	// stub
+	dummyApplication.waits.Add(1)
+
+	// mock
+	createMock(t)
+
+	// expect
+	handleSessionFuncExpected = 1
+	handleSessionFunc = func(app *application, index int, reruns int) error {
+		handleSessionFuncCalled++
+		assert.Equal(t, dummyApplication, app)
+		assert.Equal(t, 0, index)
+		assert.Equal(t, int(dummyReruns)+1, reruns)
+		return dummyError
+	}
+
+	// SUT + act
+	runInstances(
+		dummyApplication,
+	)
+
+	// assert
+	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
 
 	// verify
 	verifyAll(t)

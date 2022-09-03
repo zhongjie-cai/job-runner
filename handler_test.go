@@ -17,6 +17,7 @@ func TestInitiateSession(t *testing.T) {
 		customization: dummyCustomization,
 	}
 	var dummyIndex = rand.Intn(65536)
+	var dummyReruns = rand.Intn(65536)
 	var dummySessionID = uuid.New()
 
 	// mock
@@ -33,12 +34,14 @@ func TestInitiateSession(t *testing.T) {
 	var session = initiateSession(
 		dummyApplication,
 		dummyIndex,
+		dummyReruns,
 	)
 
 	// assert
 	assert.NotNil(t, session)
 	assert.Equal(t, dummySessionID, session.id)
 	assert.Equal(t, dummyIndex, session.index)
+	assert.Equal(t, dummyReruns, session.reruns)
 	assert.Empty(t, session.attachment)
 	assert.Equal(t, dummyCustomization, session.customization)
 
@@ -384,6 +387,7 @@ func TestHandleSession_HappyPath(t *testing.T) {
 		customization: dummyCustomization,
 	}
 	var dummyIndex = rand.Int()
+	var dummyReruns = rand.Int()
 	var dummySession = &session{id: uuid.New()}
 	var dummyTimeNow = time.Now()
 	var dummyDuration = time.Duration(rand.Intn(100))
@@ -395,10 +399,11 @@ func TestHandleSession_HappyPath(t *testing.T) {
 
 	// expect
 	initiateSessionFuncExpected = 1
-	initiateSessionFunc = func(app *application, index int) *session {
+	initiateSessionFunc = func(app *application, index int, reruns int) *session {
 		initiateSessionFuncCalled++
 		assert.Equal(t, dummyApplication, app)
 		assert.Equal(t, dummyIndex, index)
+		assert.Equal(t, dummyReruns, reruns)
 		return dummySession
 	}
 	logProcessEnterFuncExpected = 1
@@ -471,6 +476,7 @@ func TestHandleSession_HappyPath(t *testing.T) {
 	var err = handleSession(
 		dummyApplication,
 		dummyIndex,
+		dummyReruns,
 	)
 
 	// assert

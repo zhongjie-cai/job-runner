@@ -474,7 +474,7 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.second, schedule.secondIndex, increment, overflow = findValueMatchFunc(
+	schedule.second, schedule.secondIndex, _, overflow = findValueMatchFunc(
 		start.Second(),
 		schedule.seconds,
 	)

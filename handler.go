@@ -7,12 +7,14 @@ import (
 func initiateSession(
 	app *application,
 	index int,
+	reruns int,
 ) *session {
 	return &session{
-		uuidNew(),
-		index,
-		map[string]interface{}{},
-		app.customization,
+		id:            uuidNew(),
+		index:         index,
+		reruns:        reruns,
+		attachment:    map[string]interface{}{},
+		customization: app.customization,
 	}
 }
 
@@ -64,10 +66,12 @@ func processSession(
 func handleSession(
 	app *application,
 	index int,
+	reruns int,
 ) (err error) {
 	var session = initiateSessionFunc(
 		app,
 		index,
+		reruns,
 	)
 	logProcessEnterFunc(
 		session,

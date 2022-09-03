@@ -10,9 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"regexp"
 	"runtime"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,8 +60,6 @@ var (
 	fmtSprintfCalled                       int
 	marshalIgnoreErrorFuncExpected         int
 	marshalIgnoreErrorFuncCalled           int
-	debugStackExpected                     int
-	debugStackCalled                       int
 	stringsSplitExpected                   int
 	stringsSplitCalled                     int
 	strconvAtoiExpected                    int
@@ -104,8 +100,6 @@ var (
 	sortStringsCalled                      int
 	stringsJoinExpected                    int
 	stringsJoinCalled                      int
-	regexpMatchStringExpected              int
-	regexpMatchStringCalled                int
 	reflectValueOfExpected                 int
 	reflectValueOfCalled                   int
 	timeDateExpected                       int
@@ -144,8 +138,6 @@ var (
 	ioutilNopCloserCalled                  int
 	bytesNewBufferExpected                 int
 	bytesNewBufferCalled                   int
-	constructResponseFuncExpected          int
-	constructResponseFuncCalled            int
 	logProcessEnterFuncExpected            int
 	logProcessEnterFuncCalled              int
 	logProcessExitFuncExpected             int
@@ -276,7 +268,7 @@ func createMock(t *testing.T) {
 	}
 	handleSessionFuncExpected = 0
 	handleSessionFuncCalled = 0
-	handleSessionFunc = func(app *application, index int) error {
+	handleSessionFunc = func(app *application, index int, reruns int) error {
 		handleSessionFuncCalled++
 		return nil
 	}
@@ -329,12 +321,6 @@ func createMock(t *testing.T) {
 		marshalIgnoreErrorFuncCalled++
 		return ""
 	}
-	debugStackExpected = 0
-	debugStackCalled = 0
-	debugStack = func() []byte {
-		debugStackCalled++
-		return nil
-	}
 	stringsSplitExpected = 0
 	stringsSplitCalled = 0
 	stringsSplit = func(s, sep string) []string {
@@ -349,7 +335,7 @@ func createMock(t *testing.T) {
 	}
 	initiateSessionFuncExpected = 0
 	initiateSessionFuncCalled = 0
-	initiateSessionFunc = func(app *application, index int) *session {
+	initiateSessionFunc = func(app *application, index int, reruns int) *session {
 		initiateSessionFuncCalled++
 		return nil
 	}
@@ -452,12 +438,6 @@ func createMock(t *testing.T) {
 	stringsJoin = func(a []string, sep string) string {
 		stringsJoinCalled++
 		return ""
-	}
-	regexpMatchStringExpected = 0
-	regexpMatchStringCalled = 0
-	regexpMatchString = func(pattern string, s string) (bool, error) {
-		regexpMatchStringCalled++
-		return false, nil
 	}
 	reflectValueOfExpected = 0
 	reflectValueOfCalled = 0
@@ -825,8 +805,6 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, fmtSprintfExpected, fmtSprintfCalled, "Unexpected number of calls to method fmtSprintf")
 	marshalIgnoreErrorFunc = marshalIgnoreError
 	assert.Equal(t, marshalIgnoreErrorFuncExpected, marshalIgnoreErrorFuncCalled, "Unexpected number of calls to method marshalIgnoreErrorFunc")
-	debugStack = debug.Stack
-	assert.Equal(t, debugStackExpected, debugStackCalled, "Unexpected number of calls to debugStack")
 	stringsSplit = strings.Split
 	assert.Equal(t, stringsSplitExpected, stringsSplitCalled, "Unexpected number of calls to method stringsSplit")
 	strconvAtoi = strconv.Atoi
@@ -867,8 +845,6 @@ func verifyAll(t *testing.T) {
 	assert.Equal(t, sortStringsExpected, sortStringsCalled, "Unexpected number of calls to sortStrings")
 	stringsJoin = strings.Join
 	assert.Equal(t, stringsJoinExpected, stringsJoinCalled, "Unexpected number of calls to stringsJoin")
-	regexpMatchString = regexp.MatchString
-	assert.Equal(t, regexpMatchStringExpected, regexpMatchStringCalled, "Unexpected number of calls to regexpMatchString")
 	reflectValueOf = reflect.ValueOf
 	assert.Equal(t, reflectValueOfExpected, reflectValueOfCalled, "Unexpected number of calls to reflectValueOf")
 	timeDate = time.Date
@@ -1071,6 +1047,11 @@ func (session *dummySession) GetID() uuid.UUID {
 
 func (session *dummySession) GetIndex() int {
 	assert.Fail(session.t, "Unexpected call to GetIndex")
+	return 0
+}
+
+func (session *dummySession) GetReruns() int {
+	assert.Fail(session.t, "Unexpected call to GetReruns")
 	return 0
 }
 
