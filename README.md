@@ -1,4 +1,5 @@
 # job-runner
+![Coverage](https://img.shields.io/badge/Coverage-100.0%25-brightgreen)
 
 [![Build Status](https://travis-ci.com/zhongjie-cai/job-runner.svg?branch=master)](https://travis-ci.com/zhongjie-cai/job-runner)
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/zhongjie-cai/job-runner)
