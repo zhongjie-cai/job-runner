@@ -1,7 +1,10 @@
 package jobrunner
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func initiateSession(
@@ -10,7 +13,7 @@ func initiateSession(
 	reruns int,
 ) *session {
 	return &session{
-		id:            uuidNew(),
+		id:            uuid.New(),
 		index:         index,
 		reruns:        reruns,
 		attachment:    map[string]interface{}{},
@@ -30,7 +33,7 @@ func finalizeSession(
 	if errorResult == nil {
 		return recoverError
 	}
-	return fmtErrorf(
+	return fmt.Errorf(
 		"Original Error: %w\nRecover Error: %v",
 		errorResult,
 		recoverError,
@@ -68,18 +71,18 @@ func handleSession(
 	index int,
 	reruns int,
 ) (err error) {
-	var session = initiateSessionFunc(
+	var session = initiateSession(
 		app,
 		index,
 		reruns,
 	)
-	logProcessEnterFunc(
+	logProcessEnter(
 		session,
 		app.name,
 		"",
 		"",
 	)
-	logProcessRequestFunc(
+	logProcessRequest(
 		session,
 		app.name,
 		"InstanceIndex",
@@ -87,29 +90,29 @@ func handleSession(
 		index,
 	)
 	defer func(startTime time.Time) {
-		err = finalizeSessionFunc(
+		err = finalizeSession(
 			session,
 			err,
 			recover(),
 		)
-		logProcessResponseFunc(
+		logProcessResponse(
 			session,
 			app.name,
 			"",
 			"%v",
 			err,
 		)
-		logProcessExitFunc(
+		logProcessExit(
 			session,
 			app.name,
 			"Duration",
 			"%s",
-			timeSince(startTime),
+			time.Since(startTime),
 		)
 	}(
-		getTimeNowUTCFunc(),
+		time.Now().UTC(),
 	)
-	return processSessionFunc(
+	return processSession(
 		session,
 		app.customization,
 	)

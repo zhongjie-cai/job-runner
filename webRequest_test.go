@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/zhongjie-cai/gomocker/v2"
 )
 
 func TestGetClientForRequest_SendClientCert(t *testing.T) {
@@ -28,17 +27,11 @@ func TestGetClientForRequest_SendClientCert(t *testing.T) {
 	httpClientWithCert = dummyHTTPClient1
 	httpClientNoCert = dummyHTTPClient2
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	var result = getClientForRequest(true)
 
 	// assert
 	assert.Equal(t, dummyHTTPClient1, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetClientForRequest_NoSendClientCert(t *testing.T) {
@@ -50,39 +43,11 @@ func TestGetClientForRequest_NoSendClientCert(t *testing.T) {
 	httpClientWithCert = dummyHTTPClient1
 	httpClientNoCert = dummyHTTPClient2
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	var result = getClientForRequest(false)
 
 	// assert
 	assert.Equal(t, dummyHTTPClient2, result)
-
-	// verify
-	verifyAll(t)
-}
-
-func TestClientDo(t *testing.T) {
-	// arrange
-	var dummyClient = &http.Client{}
-	var dummyRequest, _ = http.NewRequest(
-		"",
-		"",
-		nil,
-	)
-
-	// assert
-	assert.NotPanics(
-		t,
-		func() {
-			// SUT + act
-			clientDo(
-				dummyClient,
-				dummyRequest,
-			)
-		},
-	)
 }
 
 func TestClientDoWithRetry_ConnError_NoRetry(t *testing.T) {
@@ -91,21 +56,15 @@ func TestClientDoWithRetry_ConnError_NoRetry(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyConnRetry = 0
 	var dummyHTTPRetry = map[int]int{}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject = &http.Response{}
 	var dummyResponseError = errors.New("some error")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 1
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		return dummyResponseObject, dummyResponseError
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, dummyResponseError).Once()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -119,9 +78,6 @@ func TestClientDoWithRetry_ConnError_NoRetry(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_ConnError_RetryOK(t *testing.T) {
@@ -130,31 +86,17 @@ func TestClientDoWithRetry_ConnError_RetryOK(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyConnRetry = 2
 	var dummyHTTPRetry = map[int]int{}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject = &http.Response{}
 	var dummyResponseError = errors.New("some error")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 2
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		if clientDoFuncCalled == 1 {
-			return dummyResponseObject, dummyResponseError
-		} else if clientDoFuncCalled == 2 {
-			return dummyResponseObject, nil
-		}
-		return nil, nil
-	}
-	timeSleepExpected = 1
-	timeSleep = func(d time.Duration) {
-		timeSleepCalled++
-		assert.Equal(t, dummyRetryDelay, d)
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, dummyResponseError).Once()
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, nil).Once()
+	m.Mock(time.Sleep).Expects(dummyRetryDelay).Returns().Once()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -168,9 +110,6 @@ func TestClientDoWithRetry_ConnError_RetryOK(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_ConnError_RetryFail(t *testing.T) {
@@ -179,26 +118,16 @@ func TestClientDoWithRetry_ConnError_RetryFail(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyConnRetry = 2
 	var dummyHTTPRetry = map[int]int{}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject = &http.Response{}
 	var dummyResponseError = errors.New("some error")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 3
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		return dummyResponseObject, dummyResponseError
-	}
-	timeSleepExpected = 2
-	timeSleep = func(d time.Duration) {
-		timeSleepCalled++
-		assert.Equal(t, dummyRetryDelay, d)
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, dummyResponseError).Times(3)
+	m.Mock(time.Sleep).Expects(dummyRetryDelay).Returns().Twice()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -212,9 +141,6 @@ func TestClientDoWithRetry_ConnError_RetryFail(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_HTTPError_NilResponse(t *testing.T) {
@@ -223,20 +149,14 @@ func TestClientDoWithRetry_HTTPError_NilResponse(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyConnRetry = rand.Int()
 	var dummyHTTPRetry = map[int]int{}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject *http.Response
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 1
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		return dummyResponseObject, nil
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, nil).Once()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -250,9 +170,6 @@ func TestClientDoWithRetry_HTTPError_NilResponse(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_HTTPError_NoRetry(t *testing.T) {
@@ -261,20 +178,14 @@ func TestClientDoWithRetry_HTTPError_NoRetry(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyConnRetry = rand.Int()
 	var dummyHTTPRetry = map[int]int{}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject = &http.Response{}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 1
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		return dummyResponseObject, nil
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, nil).Once()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -288,9 +199,6 @@ func TestClientDoWithRetry_HTTPError_NoRetry(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_HTTPError_RetryOK(t *testing.T) {
@@ -302,33 +210,19 @@ func TestClientDoWithRetry_HTTPError_RetryOK(t *testing.T) {
 	var dummyHTTPRetry = map[int]int{
 		dummyStatusCode: 2,
 	}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject1 = &http.Response{
 		StatusCode: dummyStatusCode,
 	}
 	var dummyResponseObject2 = &http.Response{}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 2
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		if clientDoFuncCalled == 1 {
-			return dummyResponseObject1, nil
-		} else if clientDoFuncCalled == 2 {
-			return dummyResponseObject2, nil
-		}
-		return nil, nil
-	}
-	timeSleepExpected = 1
-	timeSleep = func(d time.Duration) {
-		timeSleepCalled++
-		assert.Equal(t, dummyRetryDelay, d)
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject1, nil).Once()
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject2, nil).Once()
+	m.Mock(time.Sleep).Expects(dummyRetryDelay).Returns().Once()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -342,9 +236,6 @@ func TestClientDoWithRetry_HTTPError_RetryOK(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject2, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestClientDoWithRetry_HTTPError_RetryFail(t *testing.T) {
@@ -356,27 +247,17 @@ func TestClientDoWithRetry_HTTPError_RetryFail(t *testing.T) {
 	var dummyHTTPRetry = map[int]int{
 		dummyStatusCode: 2,
 	}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyResponseObject = &http.Response{
 		StatusCode: dummyStatusCode,
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	clientDoFuncExpected = 3
-	clientDoFunc = func(client *http.Client, request *http.Request) (*http.Response, error) {
-		clientDoFuncCalled++
-		assert.Equal(t, dummyClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		return dummyResponseObject, nil
-	}
-	timeSleepExpected = 2
-	timeSleep = func(d time.Duration) {
-		timeSleepCalled++
-		assert.Equal(t, dummyRetryDelay, d)
-	}
+	m.Mock((*http.Client).Do).Expects(dummyClient, dummyRequestObject).Returns(dummyResponseObject, nil).Times(3)
+	m.Mock(time.Sleep).Expects(dummyRetryDelay).Returns().Twice()
 
 	// SUT + act
 	var result, err = clientDoWithRetry(
@@ -390,30 +271,20 @@ func TestClientDoWithRetry_HTTPError_RetryFail(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetHTTPTransport_NoClientCert(t *testing.T) {
 	// arrange
-	var dummySkipServerCertVerification = rand.Intn(100) < 50
+	var dummySkipServerCertVerification = rand.IntN(100) < 50
 	var dummyClientCert *tls.Certificate
 	var dummyRoundTripper = &http.Transport{}
-	var dummyRoundTripperWrapperExpected int
-	var dummyRoundTripperWrapperCalled int
-	var dummyRoundTripperWrapper func(http.RoundTripper) http.RoundTripper
+	var dummyRoundTripperWrapper = func(rt http.RoundTripper) http.RoundTripper { return nil }
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	dummyRoundTripperWrapperExpected = 1
-	dummyRoundTripperWrapper = func(original http.RoundTripper) http.RoundTripper {
-		dummyRoundTripperWrapperCalled++
-		assert.Equal(t, http.DefaultTransport, original)
-		return dummyRoundTripper
-	}
+	m.Mock(dummyRoundTripperWrapper).Expects(http.DefaultTransport).Returns(dummyRoundTripper).Once()
 
 	// SUT + act
 	var result = getHTTPTransport(
@@ -424,31 +295,20 @@ func TestGetHTTPTransport_NoClientCert(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyRoundTripper, result)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, dummyRoundTripperWrapperExpected, dummyRoundTripperWrapperCalled, "Unexpected number of calls to method dummyRoundTripperWrapper")
 }
 
 func TestGetHTTPTransport_WithClientCert(t *testing.T) {
 	// arrange
-	var dummySkipServerCertVerification = rand.Intn(100) < 50
+	var dummySkipServerCertVerification = rand.IntN(100) < 50
 	var dummyClientCert = &tls.Certificate{}
 	var dummyRoundTripper = &http.Transport{}
-	var dummyRoundTripperWrapperExpected int
-	var dummyRoundTripperWrapperCalled int
-	var dummyRoundTripperWrapper func(http.RoundTripper) http.RoundTripper
+	var dummyRoundTripperWrapper = func(rt http.RoundTripper) http.RoundTripper { return nil }
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	dummyRoundTripperWrapperExpected = 1
-	dummyRoundTripperWrapper = func(original http.RoundTripper) http.RoundTripper {
-		dummyRoundTripperWrapperCalled++
-		assert.NotEqual(t, http.DefaultTransport, original)
-		return dummyRoundTripper
-	}
+	m.Mock(dummyRoundTripperWrapper).Expects(gomocker.Anything()).Returns(dummyRoundTripper).Once()
 
 	// SUT + act
 	var result = getHTTPTransport(
@@ -459,39 +319,27 @@ func TestGetHTTPTransport_WithClientCert(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyRoundTripper, result)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, dummyRoundTripperWrapperExpected, dummyRoundTripperWrapperCalled, "Unexpected number of calls to method dummyRoundTripperWrapper")
 }
 
 func TestInitializeHTTPClients(t *testing.T) {
 	// arrange
 	var dummyWebcallTimeout = time.Duration(rand.Int())
-	var dummySkipServerCertVerification = rand.Intn(100) < 50
+	var dummySkipServerCertVerification = rand.IntN(100) < 50
 	var dummyClientCert = &tls.Certificate{}
 	var dummyHTTPTransport1 = &http.Transport{MaxConnsPerHost: rand.Int()}
 	var dummyHTTPTransport2 = &http.Transport{MaxConnsPerHost: rand.Int()}
 	var dummyRoundTripperWrapper = func(http.RoundTripper) http.RoundTripper { return nil }
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	getHTTPTransportFuncExpected = 2
-	getHTTPTransportFunc = func(skipServerCertVerification bool, clientCertificate *tls.Certificate, roundTripperWrapper func(originalTransport http.RoundTripper) http.RoundTripper) http.RoundTripper {
-		getHTTPTransportFuncCalled++
-		assert.Equal(t, dummySkipServerCertVerification, skipServerCertVerification)
-		if getHTTPTransportFuncCalled == 1 {
-			assert.Equal(t, dummyClientCert, clientCertificate)
-			return dummyHTTPTransport1
-		} else if getHTTPTransportFuncCalled == 2 {
-			assert.Nil(t, clientCertificate)
-			return dummyHTTPTransport2
-		}
-		functionPointerEquals(t, dummyRoundTripperWrapper, roundTripperWrapper)
-		return nil
-	}
+	m.Mock(getHTTPTransport).Expects(dummySkipServerCertVerification, dummyClientCert, gomocker.Matches(func(value interface{}) bool {
+		return functionPointerEquals(dummyRoundTripperWrapper, value)
+	})).Returns(dummyHTTPTransport1).Once()
+	m.Mock(getHTTPTransport).Expects(dummySkipServerCertVerification, nil, gomocker.Matches(func(value interface{}) bool {
+		return functionPointerEquals(dummyRoundTripperWrapper, value)
+	})).Returns(dummyHTTPTransport2).Once()
 
 	// SUT + act
 	initializeHTTPClients(
@@ -508,20 +356,14 @@ func TestInitializeHTTPClients(t *testing.T) {
 	assert.NotNil(t, httpClientNoCert)
 	assert.Equal(t, dummyHTTPTransport2, httpClientNoCert.Transport)
 	assert.Equal(t, dummyWebcallTimeout, httpClientNoCert.Timeout)
-
-	// verify
-	verifyAll(t)
 }
 
-func TestWebRequestAddQuery_HappyPath(t *testing.T) {
+func TestWebREquestAddQuery_HappyPath(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyValue1 = "some value 1"
 	var dummyValue2 = "some value 2"
 	var dummyValue3 = "some value 3"
-
-	// mock
-	createMock(t)
 
 	// SUT
 	var sut = &webRequest{}
@@ -548,20 +390,14 @@ func TestWebRequestAddQuery_HappyPath(t *testing.T) {
 	assert.Equal(t, dummyValue1, values[0])
 	assert.Equal(t, dummyValue2, values[1])
 	assert.Equal(t, dummyValue3, values[2])
-
-	// verify
-	verifyAll(t)
 }
 
-func TestWebRequestAddHeader_HappyPath(t *testing.T) {
+func TestWebREquestAddHeader_HappyPath(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyValue1 = "some value 1"
 	var dummyValue2 = "some value 2"
 	var dummyValue3 = "some value 3"
-
-	// mock
-	createMock(t)
 
 	// SUT
 	var sut = &webRequest{}
@@ -588,9 +424,6 @@ func TestWebRequestAddHeader_HappyPath(t *testing.T) {
 	assert.Equal(t, dummyValue1, values[0])
 	assert.Equal(t, dummyValue2, values[1])
 	assert.Equal(t, dummyValue3, values[2])
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestSetupRetry(t *testing.T) {
@@ -600,13 +433,10 @@ func TestWebRequestSetupRetry(t *testing.T) {
 		rand.Int(): rand.Int(),
 		rand.Int(): rand.Int(),
 	}
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 
 	// SUT
 	var sut = &webRequest{}
-
-	// mock
-	createMock(t)
 
 	// act
 	var result, ok = sut.SetupRetry(
@@ -620,9 +450,6 @@ func TestWebRequestSetupRetry(t *testing.T) {
 	assert.Equal(t, dummyConnRetry, result.connRetry)
 	assert.Equal(t, dummyHTTPRetry, result.httpRetry)
 	assert.Equal(t, dummyRetryDelay, result.retryDelay)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestAnticipate(t *testing.T) {
@@ -636,9 +463,6 @@ func TestWebRequestAnticipate(t *testing.T) {
 
 	// SUT
 	var sut = &webRequest{}
-
-	// mock
-	createMock(t)
 
 	// act
 	var result, ok = sut.Anticipate(
@@ -660,9 +484,6 @@ func TestWebRequestAnticipate(t *testing.T) {
 	assert.Equal(t, dummyBeginStatusCode2, result.dataReceivers[1].beginStatusCode)
 	assert.Equal(t, dummyEndStatusCode2, result.dataReceivers[1].endStatusCode)
 	assert.Equal(t, &dummyDataTemplate2, result.dataReceivers[1].dataTemplate)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateQueryString_NilQuery(t *testing.T) {
@@ -671,16 +492,10 @@ func TestCreateQueryString_NilQuery(t *testing.T) {
 	var dummyResult = "some result"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	stringsJoinExpected = 1
-	stringsJoin = func(a []string, sep string) string {
-		stringsJoinCalled++
-		assert.Empty(t, a)
-		assert.Equal(t, "&", sep)
-		return dummyResult
-	}
+	m.Mock(strings.Join).Expects(gomocker.Anything(), "&").Returns(dummyResult).Once()
 
 	// SUT + act
 	var result = createQueryString(
@@ -689,9 +504,6 @@ func TestCreateQueryString_NilQuery(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateQueryString_EmptyQuery(t *testing.T) {
@@ -700,16 +512,10 @@ func TestCreateQueryString_EmptyQuery(t *testing.T) {
 	var dummyResult = "some result"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	stringsJoinExpected = 1
-	stringsJoin = func(a []string, sep string) string {
-		stringsJoinCalled++
-		assert.Empty(t, a)
-		assert.Equal(t, "&", sep)
-		return dummyResult
-	}
+	m.Mock(strings.Join).Expects(gomocker.Anything(), "&").Returns(dummyResult).Once()
 
 	// SUT + act
 	var result = createQueryString(
@@ -718,9 +524,6 @@ func TestCreateQueryString_EmptyQuery(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateQueryString_EmptyQueryName(t *testing.T) {
@@ -731,16 +534,10 @@ func TestCreateQueryString_EmptyQueryName(t *testing.T) {
 	var dummyResult = "some result"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	stringsJoinExpected = 1
-	stringsJoin = func(a []string, sep string) string {
-		stringsJoinCalled++
-		assert.Empty(t, a)
-		assert.Equal(t, "&", sep)
-		return dummyResult
-	}
+	m.Mock(strings.Join).Expects(gomocker.Anything(), "&").Returns(dummyResult).Once()
 
 	// SUT + act
 	var result = createQueryString(
@@ -749,9 +546,6 @@ func TestCreateQueryString_EmptyQueryName(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateQueryString_EmptyQueryValues(t *testing.T) {
@@ -763,16 +557,10 @@ func TestCreateQueryString_EmptyQueryValues(t *testing.T) {
 	var dummyResult = "some result"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	stringsJoinExpected = 1
-	stringsJoin = func(a []string, sep string) string {
-		stringsJoinCalled++
-		assert.Empty(t, a)
-		assert.Equal(t, "&", sep)
-		return dummyResult
-	}
+	m.Mock(strings.Join).Expects(gomocker.Anything(), "&").Returns(dummyResult).Once()
 
 	// SUT + act
 	var result = createQueryString(
@@ -781,62 +569,15 @@ func TestCreateQueryString_EmptyQueryValues(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateQueryString_HappyPath(t *testing.T) {
 	// arrange
-	var dummyNames = []string{
-		"some name 1",
-		"some name 2",
-		"some name 3",
-	}
-	var dummyValues = [][]string{
-		{"some value 1-1", "some value 1-2", "some value 1-3"},
-		{"some value 2-1", "some value 2-2", "some value 2-3"},
-		{"some value 3-1", "some value 3-2", "some value 3-3"},
-	}
 	var dummyQuery = map[string][]string{
 		"":          {"empty 1", "empty 2"},
-		"some name": {},
+		"some name": {"some value 1", "some value 2", "some value 3"},
 	}
-	var dummyQueryStrings = []string{}
-	var dummyResult = "some joined query"
-
-	// stub
-	for i := 0; i < len(dummyNames); i++ {
-		dummyQuery[dummyNames[i]] = dummyValues[i]
-		for j := 0; j < len(dummyValues[i]); j++ {
-			dummyQueryStrings = append(
-				dummyQueryStrings,
-				url.QueryEscape(dummyNames[i])+"="+url.QueryEscape(dummyValues[i][j]),
-			)
-		}
-	}
-
-	// mock
-	createMock(t)
-
-	// expect
-	urlQueryEscapeExpected = 18
-	urlQueryEscape = func(s string) string {
-		urlQueryEscapeCalled++
-		return url.QueryEscape(s)
-	}
-	fmtSprintfExpected = 9
-	fmtSprintf = func(format string, a ...interface{}) string {
-		fmtSprintfCalled++
-		return fmt.Sprintf(format, a...)
-	}
-	stringsJoinExpected = 1
-	stringsJoin = func(a []string, sep string) string {
-		stringsJoinCalled++
-		assert.ElementsMatch(t, dummyQueryStrings, a)
-		assert.Equal(t, "&", sep)
-		return dummyResult
-	}
+	var dummyResult = "some+name=some+value+1&some+name=some+value+2&some+name=some+value+3"
 
 	// SUT + act
 	var result = createQueryString(
@@ -845,18 +586,12 @@ func TestCreateQueryString_HappyPath(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGenerateRequestURL_NilQuery(t *testing.T) {
 	// arrange
 	var dummyBaseURL = "some base URL"
 	var dummyQuery map[string][]string = nil
-
-	// mock
-	createMock(t)
 
 	// SUT + act
 	var result = generateRequestURL(
@@ -866,9 +601,6 @@ func TestGenerateRequestURL_NilQuery(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyBaseURL, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGenerateRequestURL_EmptyQuery(t *testing.T) {
@@ -881,15 +613,10 @@ func TestGenerateRequestURL_EmptyQuery(t *testing.T) {
 	var dummyQueryString string
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	createQueryStringFuncExpected = 1
-	createQueryStringFunc = func(query map[string][]string) string {
-		createQueryStringFuncCalled++
-		assert.Equal(t, dummyQuery, query)
-		return dummyQueryString
-	}
+	m.Mock(createQueryString).Expects(dummyQuery).Returns(dummyQueryString).Once()
 
 	// SUT + act
 	var result = generateRequestURL(
@@ -899,9 +626,6 @@ func TestGenerateRequestURL_EmptyQuery(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyBaseURL, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGenerateRequestURL_Success(t *testing.T) {
@@ -915,20 +639,10 @@ func TestGenerateRequestURL_Success(t *testing.T) {
 	var dummyResult = dummyBaseURL + "?" + dummyQueryString
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	createQueryStringFuncExpected = 1
-	createQueryStringFunc = func(query map[string][]string) string {
-		createQueryStringFuncCalled++
-		assert.Equal(t, dummyQuery, query)
-		return dummyQueryString
-	}
-	fmtSprintfExpected = 1
-	fmtSprintf = func(format string, a ...interface{}) string {
-		fmtSprintfCalled++
-		return fmt.Sprintf(format, a...)
-	}
+	m.Mock(createQueryString).Expects(dummyQuery).Returns(dummyQueryString).Once()
 
 	// SUT + act
 	var result = generateRequestURL(
@@ -938,22 +652,6 @@ func TestGenerateRequestURL_Success(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyResult, result)
-
-	// verify
-	verifyAll(t)
-}
-
-type dummyCustomizationWrapRequest struct {
-	dummyCustomization
-	wrapRequest func(Session, *http.Request) *http.Request
-}
-
-func (customization *dummyCustomizationWrapRequest) WrapRequest(session Session, httpRequest *http.Request) *http.Request {
-	if customization.wrapRequest != nil {
-		return customization.wrapRequest(session, httpRequest)
-	}
-	assert.Fail(customization.t, "Unexpected call to WrapRequest")
-	return nil
 }
 
 func TestCreateHTTPRequest_NilWebRequest(t *testing.T) {
@@ -962,16 +660,10 @@ func TestCreateHTTPRequest_NilWebRequest(t *testing.T) {
 	var dummyError = errors.New("some error message")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// SUT + act
 	var result, err = createHTTPRequest(
@@ -981,9 +673,6 @@ func TestCreateHTTPRequest_NilWebRequest(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateHTTPRequest_NilWebRequestSession(t *testing.T) {
@@ -992,16 +681,10 @@ func TestCreateHTTPRequest_NilWebRequestSession(t *testing.T) {
 	var dummyError = errors.New("some error message")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// SUT + act
 	var result, err = createHTTPRequest(
@@ -1011,9 +694,6 @@ func TestCreateHTTPRequest_NilWebRequestSession(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateHTTPRequest_RequestError(t *testing.T) {
@@ -1035,8 +715,8 @@ func TestCreateHTTPRequest_RequestError(t *testing.T) {
 		rand.Int(): rand.Int(),
 		rand.Int(): rand.Int(),
 	}
-	var dummySendClientCert = rand.Intn(100) < 50
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummySendClientCert = rand.IntN(100) < 50
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyDataReceivers = []dataReceiver{
 		{0, 999, nil},
 	}
@@ -1057,30 +737,16 @@ func TestCreateHTTPRequest_RequestError(t *testing.T) {
 	var dummyRequest *http.Request
 	var dummyError = errors.New("some error message")
 
+	// stub
+	var dummyStingsReader = strings.NewReader(dummyPayload)
+
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	generateRequestURLFuncExpected = 1
-	generateRequestURLFunc = func(baseURL string, query map[string][]string) string {
-		generateRequestURLFuncCalled++
-		assert.Equal(t, dummyURL, baseURL)
-		assert.Equal(t, dummyQuery, query)
-		return dummyRequestURL
-	}
-	stringsNewReaderExpected = 1
-	stringsNewReader = func(s string) *strings.Reader {
-		stringsNewReaderCalled++
-		return strings.NewReader(s)
-	}
-	httpNewRequestExpected = 1
-	httpNewRequest = func(method, url string, body io.Reader) (*http.Request, error) {
-		httpNewRequestCalled++
-		assert.Equal(t, dummyMethod, method)
-		assert.Equal(t, dummyRequestURL, url)
-		assert.NotNil(t, body)
-		return dummyRequest, dummyError
-	}
+	m.Mock(generateRequestURL).Expects(dummyURL, dummyQuery).Returns(dummyRequestURL).Once()
+	m.Mock(strings.NewReader).Expects(dummyPayload).Returns(dummyStingsReader).Once()
+	m.Mock(http.NewRequest).Expects(dummyMethod, dummyRequestURL, gomocker.Anything()).Returns(dummyRequest, dummyError).Once()
 
 	// SUT + act
 	var result, err = createHTTPRequest(
@@ -1090,18 +756,13 @@ func TestCreateHTTPRequest_RequestError(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestCreateHTTPRequest_Success(t *testing.T) {
 	// arrange
-	var dummyCustomizationWrapRequest = &dummyCustomizationWrapRequest{
-		dummyCustomization: dummyCustomization{t: t},
-	}
+	var dummyCustomization = &DefaultCustomization{}
 	var dummySession = &session{
-		customization: dummyCustomizationWrapRequest,
+		customization: dummyCustomization,
 	}
 	var dummyMethod = "some method"
 	var dummyURL = "some URL"
@@ -1119,8 +780,8 @@ func TestCreateHTTPRequest_Success(t *testing.T) {
 		rand.Int(): rand.Int(),
 		rand.Int(): rand.Int(),
 	}
-	var dummySendClientCert = rand.Intn(100) < 50
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummySendClientCert = rand.IntN(100) < 50
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyDataReceivers = []dataReceiver{
 		{0, 999, nil},
 	}
@@ -1142,71 +803,25 @@ func TestCreateHTTPRequest_Success(t *testing.T) {
 		RequestURI: "abc",
 	}
 	var dummyHeaderContent = "some header content"
-	var customizationWrapRequestExpected int
-	var customizationWrapRequestCalled int
 	var dummyCustomized = &http.Request{
 		RequestURI: "def",
 	}
 
+	// stub
+	var dummyStingsReader = strings.NewReader(dummyPayload)
+
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	generateRequestURLFuncExpected = 1
-	generateRequestURLFunc = func(baseURL string, query map[string][]string) string {
-		generateRequestURLFuncCalled++
-		assert.Equal(t, dummyURL, baseURL)
-		assert.Equal(t, dummyQuery, query)
-		return dummyRequestURL
-	}
-	stringsNewReaderExpected = 1
-	stringsNewReader = func(s string) *strings.Reader {
-		stringsNewReaderCalled++
-		return strings.NewReader(s)
-	}
-	httpNewRequestExpected = 1
-	httpNewRequest = func(method, url string, body io.Reader) (*http.Request, error) {
-		httpNewRequestCalled++
-		assert.Equal(t, dummyMethod, method)
-		assert.Equal(t, dummyRequestURL, url)
-		assert.NotNil(t, body)
-		return dummyRequest, nil
-	}
-	logWebcallStartFuncExpected = 1
-	logWebcallStartFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallStartFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyMethod, category)
-		assert.Equal(t, dummyURL, subcategory)
-		assert.Equal(t, dummyRequestURL, messageFormat)
-		assert.Empty(t, parameters)
-	}
-	logWebcallRequestFuncExpected = 2
-	logWebcallRequestFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallRequestFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Content", subcategory)
-		assert.Empty(t, parameters)
-		if logWebcallRequestFuncCalled == 1 {
-			assert.Equal(t, "Payload", category)
-			assert.Equal(t, dummyPayload, messageFormat)
-		} else if logWebcallRequestFuncCalled == 2 {
-			assert.Equal(t, "Header", category)
-			assert.Equal(t, dummyHeaderContent, messageFormat)
-		}
-	}
-	marshalIgnoreErrorFuncExpected = 1
-	marshalIgnoreErrorFunc = func(v interface{}) string {
-		marshalIgnoreErrorFuncCalled++
-		return dummyHeaderContent
-	}
-	customizationWrapRequestExpected = 1
-	dummyCustomizationWrapRequest.wrapRequest = func(session Session, httpRequest *http.Request) *http.Request {
-		customizationWrapRequestCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyRequest, httpRequest)
-		return dummyCustomized
-	}
+	m.Mock(generateRequestURL).Expects(dummyURL, dummyQuery).Returns(dummyRequestURL).Once()
+	m.Mock(strings.NewReader).Expects(dummyPayload).Returns(dummyStingsReader).Once()
+	m.Mock(http.NewRequest).Expects(dummyMethod, dummyRequestURL, gomocker.Anything()).Returns(dummyRequest, nil).Once()
+	m.Mock(logWebcallStart).Expects(dummySession, dummyMethod, dummyURL, dummyRequestURL).Returns().Once()
+	m.Mock(logWebcallRequest).Expects(dummySession, "Payload", "Content", dummyPayload).Returns().Once()
+	m.Mock(logWebcallRequest).Expects(dummySession, "Header", "Content", dummyHeaderContent).Returns().Once()
+	m.Mock(marshalIgnoreError).Expects(gomocker.Anything()).Returns(dummyHeaderContent).Once()
+	m.Mock((*DefaultCustomization).WrapRequest).Expects(dummyCustomization, dummySession, dummyRequest).Returns(dummyCustomized).Once()
 
 	// SUT + act
 	var result, err = createHTTPRequest(
@@ -1216,10 +831,6 @@ func TestCreateHTTPRequest_Success(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyCustomized, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationWrapRequestExpected, customizationWrapRequestCalled, "Unexpected number of calls to method customization.WrapRequest")
 }
 
 func TestLogErrorResponse(t *testing.T) {
@@ -1227,38 +838,15 @@ func TestLogErrorResponse(t *testing.T) {
 	var dummySession = &session{id: uuid.New()}
 	var dummyError = errors.New("some error")
 	var dummyStartTime = time.Now()
-	var dummyTimeSince = time.Duration(rand.Intn(1000))
+	var dummyTimeSince = time.Duration(rand.IntN(1000))
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	logWebcallResponseFuncExpected = 1
-	logWebcallResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Error", category)
-		assert.Equal(t, "Content", subcategory)
-		assert.Equal(t, "%+v", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyError, parameters[0])
-	}
-	timeSinceExpected = 1
-	timeSince = func(ts time.Time) time.Duration {
-		timeSinceCalled++
-		assert.Equal(t, dummyStartTime, ts)
-		return dummyTimeSince
-	}
-	logWebcallFinishFuncExpected = 1
-	logWebcallFinishFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallFinishFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Error", category)
-		assert.Equal(t, "-1", subcategory)
-		assert.Equal(t, "%s", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyTimeSince, parameters[0])
-	}
+	m.Mock(logWebcallResponse).Expects(dummySession, "Error", "Content", "%+v", dummyError).Returns().Once()
+	m.Mock(time.Since).Expects(dummyStartTime).Returns(dummyTimeSince).Once()
+	m.Mock(logWebcallFinish).Expects(dummySession, "Error", "-1", "%s", dummyTimeSince).Returns().Once()
 
 	// SUT + act
 	logErrorResponse(
@@ -1266,9 +854,6 @@ func TestLogErrorResponse(t *testing.T) {
 		dummyError,
 		dummyStartTime,
 	)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestLogSuccessResponse_NilResponse(t *testing.T) {
@@ -1277,26 +862,20 @@ func TestLogSuccessResponse_NilResponse(t *testing.T) {
 	var dummyResponse *http.Response
 	var dummyStartTime = time.Now()
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	logSuccessResponse(
 		dummySession,
 		dummyResponse,
 		dummyStartTime,
 	)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestLogSuccessResponse_ValidResponse(t *testing.T) {
 	// arrange
 	var dummySession = &session{id: uuid.New()}
 	var dummyStatus = "some status"
-	var dummyStatusCode = rand.Intn(1000)
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyStatusCode = rand.IntN(1000)
+	var dummyBody = io.NopCloser(bytes.NewBufferString("some body"))
 	var dummyHeader = http.Header{
 		"foo":  []string{"bar"},
 		"test": []string{"123", "456", "789"},
@@ -1310,81 +889,24 @@ func TestLogSuccessResponse_ValidResponse(t *testing.T) {
 	var dummyResponseBody = string(dummyResponseBytes)
 	var dummyError = errors.New("some error")
 	var dummyBuffer = &bytes.Buffer{}
-	var dummyNewBody = ioutil.NopCloser(bytes.NewBufferString("some new body"))
+	var dummyNewBody = io.NopCloser(bytes.NewBufferString("some new body"))
 	var dummyStartTime = time.Now()
 	var dummyHeaderContent = "some header content"
-	var dummyTimeSince = time.Duration(rand.Intn(1000))
+	var dummyTimeSince = time.Duration(rand.IntN(1000))
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	ioutilReadAllExpected = 1
-	ioutilReadAll = func(r io.Reader) ([]byte, error) {
-		ioutilReadAllCalled++
-		assert.Equal(t, dummyBody, r)
-		return dummyResponseBytes, dummyError
-	}
-	bytesNewBufferExpected = 1
-	bytesNewBuffer = func(buf []byte) *bytes.Buffer {
-		bytesNewBufferCalled++
-		assert.Equal(t, dummyResponseBytes, buf)
-		return dummyBuffer
-	}
-	ioutilNopCloserExpected = 1
-	ioutilNopCloser = func(r io.Reader) io.ReadCloser {
-		ioutilNopCloserCalled++
-		assert.Equal(t, dummyBuffer, r)
-		return dummyNewBody
-	}
-	httpStatusTextExpected = 1
-	httpStatusText = func(code int) string {
-		httpStatusTextCalled++
-		assert.Equal(t, dummyStatusCode, code)
-		return dummyStatus
-	}
-	strconvItoaExpected = 1
-	strconvItoa = func(i int) string {
-		strconvItoaCalled++
-		assert.Equal(t, dummyStatusCode, i)
-		return strconv.Itoa(i)
-	}
-	logWebcallResponseFuncExpected = 2
-	logWebcallResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Content", subcategory)
-		assert.Empty(t, parameters)
-		if logWebcallResponseFuncCalled == 1 {
-			assert.Equal(t, "Header", category)
-			assert.Equal(t, dummyHeaderContent, messageFormat)
-		} else if logWebcallResponseFuncCalled == 2 {
-			assert.Equal(t, "Body", category)
-			assert.Equal(t, dummyResponseBody, messageFormat)
-		}
-	}
-	marshalIgnoreErrorFuncExpected = 1
-	marshalIgnoreErrorFunc = func(v interface{}) string {
-		marshalIgnoreErrorFuncCalled++
-		assert.Equal(t, dummyHeader, v)
-		return dummyHeaderContent
-	}
-	timeSinceExpected = 1
-	timeSince = func(ts time.Time) time.Duration {
-		timeSinceCalled++
-		assert.Equal(t, dummyStartTime, ts)
-		return dummyTimeSince
-	}
-	logWebcallFinishFuncExpected = 1
-	logWebcallFinishFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallFinishFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyStatus, category)
-		assert.Equal(t, strconv.Itoa(dummyStatusCode), subcategory)
-		assert.Equal(t, "%s", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyTimeSince, parameters[0])
-	}
+	m.Mock(io.ReadAll).Expects(dummyBody).Returns(dummyResponseBytes, dummyError).Once()
+	m.Mock(bytes.NewBuffer).Expects(dummyResponseBytes).Returns(dummyBuffer).Once()
+	m.Mock(io.NopCloser).Expects(dummyBuffer).Returns(dummyNewBody).Once()
+	m.Mock(http.StatusText).Expects(dummyStatusCode).Returns(dummyStatus).Once()
+	m.Mock(logWebcallResponse).Expects(dummySession, "Header", "Content", dummyHeaderContent).Returns().Once()
+	m.Mock(logWebcallResponse).Expects(dummySession, "Body", "Content", dummyResponseBody).Returns().Once()
+	m.Mock(marshalIgnoreError).Expects(gomocker.Anything()).Returns(dummyHeaderContent).Once()
+	m.Mock(time.Since).Expects(dummyStartTime).Returns(dummyTimeSince).Once()
+	m.Mock(logWebcallFinish).Expects(dummySession, dummyStatus, strconv.Itoa(dummyStatusCode), "%s", dummyTimeSince).Returns().Once()
 
 	// SUT + act
 	logSuccessResponse(
@@ -1395,9 +917,6 @@ func TestLogSuccessResponse_ValidResponse(t *testing.T) {
 
 	// assert
 	assert.Equal(t, dummyNewBody, dummyResponse.Body)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestDoRequestProcessing_NilWebRequest(t *testing.T) {
@@ -1406,16 +925,10 @@ func TestDoRequestProcessing_NilWebRequest(t *testing.T) {
 	var dummyError = errors.New("some error message")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// SUT + act
 	var result, err = doRequestProcessing(
@@ -1425,9 +938,6 @@ func TestDoRequestProcessing_NilWebRequest(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestDoRequestProcessing_NilWebRequestSession(t *testing.T) {
@@ -1436,16 +946,10 @@ func TestDoRequestProcessing_NilWebRequestSession(t *testing.T) {
 	var dummyError = errors.New("some error message")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// SUT + act
 	var result, err = doRequestProcessing(
@@ -1455,9 +959,6 @@ func TestDoRequestProcessing_NilWebRequestSession(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestDoRequestProcessing_RequestError(t *testing.T) {
@@ -1469,15 +970,10 @@ func TestDoRequestProcessing_RequestError(t *testing.T) {
 	var dummyRequestError = errors.New("some error")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	createHTTPRequestFuncExpected = 1
-	createHTTPRequestFunc = func(webRequest *webRequest) (*http.Request, error) {
-		createHTTPRequestFuncCalled++
-		assert.Equal(t, dummyWebRequest, webRequest)
-		return dummyRequestObject, dummyRequestError
-	}
+	m.Mock(createHTTPRequest).Expects(dummyWebRequest).Returns(dummyRequestObject, dummyRequestError).Once()
 
 	// SUT + act
 	var result, err = doRequestProcessing(
@@ -1487,9 +983,6 @@ func TestDoRequestProcessing_RequestError(t *testing.T) {
 	// assert
 	assert.Nil(t, result)
 	assert.Equal(t, dummyRequestError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestDoRequestProcessing_ResponseError(t *testing.T) {
@@ -1500,8 +993,8 @@ func TestDoRequestProcessing_ResponseError(t *testing.T) {
 		rand.Int(): rand.Int(),
 		rand.Int(): rand.Int(),
 	}
-	var dummySendClientCert = rand.Intn(100) < 50
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummySendClientCert = rand.IntN(100) < 50
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyWebRequest = &webRequest{
 		session:        dummySession,
 		connRetry:      dummyConnRetry,
@@ -1513,46 +1006,17 @@ func TestDoRequestProcessing_ResponseError(t *testing.T) {
 	var dummyRequestObject = &http.Request{}
 	var dummyResponseObject *http.Response
 	var dummyResponseError = errors.New("some error")
-	var dummyStartTime = time.Now()
+	var dummyStartTime = time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	createHTTPRequestFuncExpected = 1
-	createHTTPRequestFunc = func(webRequest *webRequest) (*http.Request, error) {
-		createHTTPRequestFuncCalled++
-		assert.Equal(t, dummyWebRequest, webRequest)
-		return dummyRequestObject, nil
-	}
-	getClientForRequestFuncExpected = 1
-	getClientForRequestFunc = func(sendClientCert bool) *http.Client {
-		getClientForRequestFuncCalled++
-		assert.Equal(t, dummySendClientCert, sendClientCert)
-		return dummyHTTPClient
-	}
-	getTimeNowUTCFuncExpected = 1
-	getTimeNowUTCFunc = func() time.Time {
-		getTimeNowUTCFuncCalled++
-		return dummyStartTime
-	}
-	clientDoWithRetryFuncExpected = 1
-	clientDoWithRetryFunc = func(client *http.Client, request *http.Request, connRetry int, httpRetry map[int]int, retryDelay time.Duration) (*http.Response, error) {
-		clientDoWithRetryFuncCalled++
-		assert.Equal(t, dummyHTTPClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		assert.Equal(t, dummyConnRetry, connRetry)
-		assert.Equal(t, dummyHTTPRetry, httpRetry)
-		assert.Equal(t, dummyRetryDelay, retryDelay)
-		return dummyResponseObject, dummyResponseError
-	}
-	logErrorResponseFuncExpected = 1
-	logErrorResponseFunc = func(session *session, responseError error, startTime time.Time) {
-		logErrorResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyResponseError, responseError)
-		assert.Equal(t, dummyStartTime, startTime)
-	}
+	m.Mock(createHTTPRequest).Expects(dummyWebRequest).Returns(dummyRequestObject, nil).Once()
+	m.Mock(getClientForRequest).Expects(dummySendClientCert).Returns(dummyHTTPClient).Once()
+	m.Mock(time.Now).Expects().Returns(dummyStartTime).Once()
+	m.Mock(clientDoWithRetry).Expects(dummyHTTPClient, dummyRequestObject, dummyConnRetry, dummyHTTPRetry, dummyRetryDelay).Returns(dummyResponseObject, dummyResponseError).Once()
+	m.Mock(logErrorResponse).Expects(dummySession, dummyResponseError, dummyStartTime).Returns().Once()
 
 	// SUT + act
 	var result, err = doRequestProcessing(
@@ -1562,9 +1026,6 @@ func TestDoRequestProcessing_ResponseError(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestDoRequestProcessing_ResponseSuccess(t *testing.T) {
@@ -1575,8 +1036,8 @@ func TestDoRequestProcessing_ResponseSuccess(t *testing.T) {
 		rand.Int(): rand.Int(),
 		rand.Int(): rand.Int(),
 	}
-	var dummySendClientCert = rand.Intn(100) < 50
-	var dummyRetryDelay = time.Duration(rand.Intn(100))
+	var dummySendClientCert = rand.IntN(100) < 50
+	var dummyRetryDelay = time.Duration(rand.IntN(100))
 	var dummyWebRequest = &webRequest{
 		session:        dummySession,
 		connRetry:      dummyConnRetry,
@@ -1587,46 +1048,17 @@ func TestDoRequestProcessing_ResponseSuccess(t *testing.T) {
 	var dummyHTTPClient = &http.Client{}
 	var dummyRequestObject = &http.Request{}
 	var dummyResponseObject = &http.Response{}
-	var dummyStartTime = time.Now()
+	var dummyStartTime = time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	createHTTPRequestFuncExpected = 1
-	createHTTPRequestFunc = func(webRequest *webRequest) (*http.Request, error) {
-		createHTTPRequestFuncCalled++
-		assert.Equal(t, dummyWebRequest, webRequest)
-		return dummyRequestObject, nil
-	}
-	getClientForRequestFuncExpected = 1
-	getClientForRequestFunc = func(sendClientCert bool) *http.Client {
-		getClientForRequestFuncCalled++
-		assert.Equal(t, dummySendClientCert, sendClientCert)
-		return dummyHTTPClient
-	}
-	getTimeNowUTCFuncExpected = 1
-	getTimeNowUTCFunc = func() time.Time {
-		getTimeNowUTCFuncCalled++
-		return dummyStartTime
-	}
-	clientDoWithRetryFuncExpected = 1
-	clientDoWithRetryFunc = func(client *http.Client, request *http.Request, connRetry int, httpRetry map[int]int, retryDelay time.Duration) (*http.Response, error) {
-		clientDoWithRetryFuncCalled++
-		assert.Equal(t, dummyHTTPClient, client)
-		assert.Equal(t, dummyRequestObject, request)
-		assert.Equal(t, dummyConnRetry, connRetry)
-		assert.Equal(t, dummyHTTPRetry, httpRetry)
-		assert.Equal(t, dummyRetryDelay, retryDelay)
-		return dummyResponseObject, nil
-	}
-	logSuccessResponseFuncExpected = 1
-	logSuccessResponseFunc = func(session *session, response *http.Response, startTime time.Time) {
-		logSuccessResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyResponseObject, response)
-		assert.Equal(t, dummyStartTime, startTime)
-	}
+	m.Mock(createHTTPRequest).Expects(dummyWebRequest).Returns(dummyRequestObject, nil).Once()
+	m.Mock(getClientForRequest).Expects(dummySendClientCert).Returns(dummyHTTPClient).Once()
+	m.Mock(time.Now).Expects().Returns(dummyStartTime).Once()
+	m.Mock(clientDoWithRetry).Expects(dummyHTTPClient, dummyRequestObject, dummyConnRetry, dummyHTTPRetry, dummyRetryDelay).Returns(dummyResponseObject, nil).Once()
+	m.Mock(logSuccessResponse).Expects(dummySession, dummyResponseObject, dummyStartTime).Returns().Once()
 
 	// SUT + act
 	var result, err = doRequestProcessing(
@@ -1636,37 +1068,20 @@ func TestDoRequestProcessing_ResponseSuccess(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyResponseObject, result)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetDataTemplate_EmptyDataReceivers(t *testing.T) {
 	// arrange
 	var dummySession = &session{}
-	var dummyStatusCode = rand.Intn(100)
+	var dummyStatusCode = rand.IntN(100)
 	var dummyDataReceivers = []dataReceiver{}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Nil(t, i)
-		return true
-	}
-	logWebcallResponseFuncExpected = 1
-	logWebcallResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Body", category)
-		assert.Equal(t, "Receiver", subcategory)
-		assert.Equal(t, "No data template registered for HTTP status %v", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyStatusCode, parameters[0])
-	}
+	m.Mock(isInterfaceValueNil).Expects(nil).Returns(true).Once()
+	m.Mock(logWebcallResponse).Expects(dummySession, "Body", "Receiver", "No data template registered for HTTP status %v", dummyStatusCode).Returns().Once()
 
 	// SUT + act
 	var result = getDataTemplate(
@@ -1677,44 +1092,27 @@ func TestGetDataTemplate_EmptyDataReceivers(t *testing.T) {
 
 	// assert
 	assert.Nil(t, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetDataTemplate_NoMatch(t *testing.T) {
 	// arrange
 	var dummySession = &session{}
-	var dummyStatusCode = rand.Intn(100)
+	var dummyStatusCode = rand.IntN(100)
 	var dummyDataTemplate string
 	var dummyDataReceivers = []dataReceiver{
 		{
-			beginStatusCode: rand.Intn(100) + 100,
-			endStatusCode:   rand.Intn(100) + 200,
+			beginStatusCode: rand.IntN(100) + 100,
+			endStatusCode:   rand.IntN(100) + 200,
 			dataTemplate:    &dummyDataTemplate,
 		},
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Nil(t, i)
-		return true
-	}
-	logWebcallResponseFuncExpected = 1
-	logWebcallResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Body", category)
-		assert.Equal(t, "Receiver", subcategory)
-		assert.Equal(t, "No data template registered for HTTP status %v", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyStatusCode, parameters[0])
-	}
+	m.Mock(isInterfaceValueNil).Expects(nil).Returns(true).Once()
+	m.Mock(logWebcallResponse).Expects(dummySession, "Body", "Receiver", "No data template registered for HTTP status %v", dummyStatusCode).Returns().Once()
 
 	// SUT + act
 	var result = getDataTemplate(
@@ -1725,40 +1123,32 @@ func TestGetDataTemplate_NoMatch(t *testing.T) {
 
 	// assert
 	assert.Nil(t, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetDataTemplate_SingleMatch(t *testing.T) {
 	// arrange
 	var dummySession = &session{}
-	var dummyStatusCode = rand.Intn(100)
+	var dummyStatusCode = rand.IntN(100)
 	var dummyDataTemplate1 string
 	var dummyDataTemplate2 int
 	var dummyDataReceivers = []dataReceiver{
 		{
-			beginStatusCode: dummyStatusCode - rand.Intn(10),
-			endStatusCode:   dummyStatusCode + 1 + rand.Intn(10),
+			beginStatusCode: dummyStatusCode - rand.IntN(10),
+			endStatusCode:   dummyStatusCode + 1 + rand.IntN(10),
 			dataTemplate:    &dummyDataTemplate1,
 		},
 		{
-			beginStatusCode: rand.Intn(100) + 100,
-			endStatusCode:   rand.Intn(100) + 200,
+			beginStatusCode: rand.IntN(100) + 100,
+			endStatusCode:   rand.IntN(100) + 200,
 			dataTemplate:    &dummyDataTemplate2,
 		},
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate1, i)
-		return false
-	}
+	m.Mock(isInterfaceValueNil).Expects(&dummyDataTemplate1).Returns(false).Once()
 
 	// SUT + act
 	var result = getDataTemplate(
@@ -1769,40 +1159,32 @@ func TestGetDataTemplate_SingleMatch(t *testing.T) {
 
 	// assert
 	assert.Equal(t, &dummyDataTemplate1, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestGetDataTemplate_OverlapMatch(t *testing.T) {
 	// arrange
 	var dummySession = &session{}
-	var dummyStatusCode = rand.Intn(100)
+	var dummyStatusCode = rand.IntN(100)
 	var dummyDataTemplate1 string
 	var dummyDataTemplate2 int
 	var dummyDataReceivers = []dataReceiver{
 		{
-			beginStatusCode: dummyStatusCode - rand.Intn(10),
-			endStatusCode:   dummyStatusCode + 1 + rand.Intn(10),
+			beginStatusCode: dummyStatusCode - rand.IntN(10),
+			endStatusCode:   dummyStatusCode + 1 + rand.IntN(10),
 			dataTemplate:    &dummyDataTemplate1,
 		},
 		{
-			beginStatusCode: dummyStatusCode - rand.Intn(10),
-			endStatusCode:   dummyStatusCode + 1 + rand.Intn(10),
+			beginStatusCode: dummyStatusCode - rand.IntN(10),
+			endStatusCode:   dummyStatusCode + 1 + rand.IntN(10),
 			dataTemplate:    &dummyDataTemplate2,
 		},
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, &dummyDataTemplate2, i)
-		return false
-	}
+	m.Mock(isInterfaceValueNil).Expects(&dummyDataTemplate2).Returns(false).Once()
 
 	// SUT + act
 	var result = getDataTemplate(
@@ -1813,29 +1195,21 @@ func TestGetDataTemplate_OverlapMatch(t *testing.T) {
 
 	// assert
 	assert.Equal(t, &dummyDataTemplate2, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestParseResponse_ReadError(t *testing.T) {
 	// arrange
 	var dummySession = &session{id: uuid.New()}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyBody = io.NopCloser(bytes.NewBufferString("some body"))
 	var dummyBytes = []byte("some bytes")
 	var dummyError = errors.New("some error")
 	var dummyDataTemplate string
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	ioutilReadAllExpected = 1
-	ioutilReadAll = func(r io.Reader) ([]byte, error) {
-		ioutilReadAllCalled++
-		assert.Equal(t, dummyBody, r)
-		return dummyBytes, dummyError
-	}
+	m.Mock(io.ReadAll).Expects(dummyBody).Returns(dummyBytes, dummyError).Once()
 
 	// SUT + act
 	var err = parseResponse(
@@ -1847,45 +1221,23 @@ func TestParseResponse_ReadError(t *testing.T) {
 	// assert
 	assert.Zero(t, dummyDataTemplate)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestParseResponse_JSONError(t *testing.T) {
 	// arrange
 	var dummySession = &session{id: uuid.New()}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyBody = io.NopCloser(bytes.NewBufferString("some body"))
 	var dummyBytes = []byte("some bytes")
 	var dummyError = errors.New("some error")
 	var dummyDataTemplate string
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	ioutilReadAllExpected = 1
-	ioutilReadAll = func(r io.Reader) ([]byte, error) {
-		ioutilReadAllCalled++
-		assert.Equal(t, dummyBody, r)
-		return dummyBytes, nil
-	}
-	tryUnmarshalFuncExpected = 1
-	tryUnmarshalFunc = func(value string, dataTemplate interface{}) error {
-		tryUnmarshalFuncCalled++
-		assert.Equal(t, string(dummyBytes), value)
-		return dummyError
-	}
-	logWebcallResponseFuncExpected = 1
-	logWebcallResponseFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logWebcallResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "Body", category)
-		assert.Equal(t, "UnmarshalError", subcategory)
-		assert.Equal(t, "%+v", messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyError, parameters[0])
-	}
+	m.Mock(io.ReadAll).Expects(dummyBody).Returns(dummyBytes, nil).Once()
+	m.Mock(tryUnmarshal).Expects(string(dummyBytes), gomocker.Anything()).Returns(dummyError).Once()
+	m.Mock(logWebcallResponse).Expects(dummySession, "Body", "UnmarshalError", "%+v", dummyError).Returns().Once()
 
 	// SUT + act
 	var err = parseResponse(
@@ -1897,36 +1249,24 @@ func TestParseResponse_JSONError(t *testing.T) {
 	// assert
 	assert.Zero(t, dummyDataTemplate)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestParseResponse_HappyPath(t *testing.T) {
 	// arrange
 	var dummySession = &session{id: uuid.New()}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyBody = io.NopCloser(bytes.NewBufferString("some body"))
 	var dummyData = "some data"
 	var dummyBytes = []byte("\"" + dummyData + "\"")
 	var dummyDataTemplate string
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	ioutilReadAllExpected = 1
-	ioutilReadAll = func(r io.Reader) ([]byte, error) {
-		ioutilReadAllCalled++
-		assert.Equal(t, dummyBody, r)
-		return dummyBytes, nil
-	}
-	tryUnmarshalFuncExpected = 1
-	tryUnmarshalFunc = func(value string, dataTemplate interface{}) error {
-		tryUnmarshalFuncCalled++
-		assert.Equal(t, string(dummyBytes), value)
-		(*(dataTemplate).(*string)) = dummyData
-		return nil
-	}
+	m.Mock(io.ReadAll).Expects(dummyBody).Returns(dummyBytes, nil).Once()
+	m.Mock(tryUnmarshal).Expects(string(dummyBytes), gomocker.Anything()).Returns(nil).SideEffect(func(index int, params ...interface{}) {
+		(*(params[1]).(*string)) = dummyData
+	}).Once()
 
 	// SUT + act
 	var err = parseResponse(
@@ -1938,9 +1278,6 @@ func TestParseResponse_HappyPath(t *testing.T) {
 	// assert
 	assert.Equal(t, dummyData, dummyDataTemplate)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_NilWebRequest(t *testing.T) {
@@ -1951,27 +1288,18 @@ func TestWebRequestProcess_NilWebRequest(t *testing.T) {
 	var sut *webRequest
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// act
 	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, result)
-	assert.Nil(t, header)
+	assert.Equal(t, 0, result)
+	assert.Empty(t, header)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_NilWebRequestSession(t *testing.T) {
@@ -1982,27 +1310,18 @@ func TestWebRequestProcess_NilWebRequestSession(t *testing.T) {
 	var sut = &webRequest{}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	fmtErrorfExpected = 1
-	fmtErrorf = func(format string, a ...interface{}) error {
-		fmtErrorfCalled++
-		assert.Equal(t, "WebRequest is nil or contains invalid session", format)
-		assert.Empty(t, a)
-		return dummyError
-	}
+	m.Mock(fmt.Errorf).Expects("WebRequest is nil or contains invalid session").Returns(dummyError).Once()
 
 	// act
 	var result, header, err = sut.Process()
 
 	// assert
-	assert.Zero(t, result)
-	assert.Nil(t, header)
+	assert.Equal(t, 0, result)
+	assert.Empty(t, header)
 	assert.Equal(t, dummyError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_Error_NilObject(t *testing.T) {
@@ -2016,15 +1335,10 @@ func TestWebRequestProcess_Error_NilObject(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
+	m.Mock(doRequestProcessing).Expects(sut).Returns(dummyResponseObject, dummyResponseError).Once()
 
 	// act
 	var result, header, err = sut.Process()
@@ -2033,9 +1347,6 @@ func TestWebRequestProcess_Error_NilObject(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, result)
 	assert.Empty(t, header)
 	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_Error_ValidObject(t *testing.T) {
@@ -2057,15 +1368,10 @@ func TestWebRequestProcess_Error_ValidObject(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
+	m.Mock(doRequestProcessing).Expects(sut).Returns(dummyResponseObject, dummyResponseError).Once()
 
 	// act
 	var result, header, err = sut.Process()
@@ -2074,9 +1380,6 @@ func TestWebRequestProcess_Error_ValidObject(t *testing.T) {
 	assert.Equal(t, dummyStatusCode, result)
 	assert.Equal(t, http.Header(dummyHeader), header)
 	assert.Equal(t, dummyResponseError, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_Success_NilObject(t *testing.T) {
@@ -2090,15 +1393,10 @@ func TestWebRequestProcess_Success_NilObject(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
+	m.Mock(doRequestProcessing).Expects(sut).Returns(dummyResponseObject, dummyResponseError).Once()
 
 	// act
 	var result, header, err = sut.Process()
@@ -2107,9 +1405,6 @@ func TestWebRequestProcess_Success_NilObject(t *testing.T) {
 	assert.Zero(t, result)
 	assert.Empty(t, header)
 	assert.NoError(t, err)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
@@ -2119,7 +1414,7 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 		"foo":  {"bar"},
 		"test": {"123", "456", "789"},
 	}
-	var dummyBody = ioutil.NopCloser(bytes.NewBufferString("some body"))
+	var dummyBody = io.NopCloser(bytes.NewBufferString("some body"))
 	var dummyResponseObject = &http.Response{
 		StatusCode: dummyStatusCode,
 		Header:     dummyHeader,
@@ -2141,31 +1436,14 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	doRequestProcessingFuncExpected = 1
-	doRequestProcessingFunc = func(webRequest *webRequest) (*http.Response, error) {
-		doRequestProcessingFuncCalled++
-		assert.Equal(t, sut, webRequest)
-		return dummyResponseObject, dummyResponseError
-	}
-	getDataTemplateFuncExpected = 1
-	getDataTemplateFunc = func(session *session, statusCode int, dataReceivers []dataReceiver) interface{} {
-		getDataTemplateFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyStatusCode, statusCode)
-		assert.Equal(t, dummyDataReceivers, dataReceivers)
-		return &dummyDataTemplate
-	}
-	parseResponseFuncExpected = 1
-	parseResponseFunc = func(session *session, body io.ReadCloser, dataTemplate interface{}) error {
-		parseResponseFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, dummyBody, body)
-		(*(dataTemplate).(*string)) = dummyData
-		return dummyParseError
-	}
+	m.Mock(doRequestProcessing).Expects(sut).Returns(dummyResponseObject, dummyResponseError).Once()
+	m.Mock(getDataTemplate).Expects(dummySession, dummyStatusCode, dummyDataReceivers).Returns(&dummyDataTemplate).Once()
+	m.Mock(parseResponse).Expects(dummySession, dummyBody, gomocker.Anything()).Returns(dummyParseError).SideEffect(func(index int, params ...interface{}) {
+		(*(params[2]).(*string)) = dummyData
+	}).Once()
 
 	// act
 	var result, header, err = sut.Process()
@@ -2175,7 +1453,4 @@ func TestWebRequestProcess_Success_ValidObject(t *testing.T) {
 	assert.Equal(t, dummyStatusCode, result)
 	assert.Equal(t, http.Header(dummyHeader), header)
 	assert.Equal(t, dummyParseError, err)
-
-	// verify
-	verifyAll(t)
 }

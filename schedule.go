@@ -53,7 +53,7 @@ func getDaysOfMonth(year int, month int) int {
 	// plays a trick that time.Date accepts values outside of normal ranges
 	//   so setting day to 0 would actually yield the last day of a previous month
 	//   that helps calculate the number of days within a given month
-	var lastDay = timeDate(
+	var lastDay = time.Date(
 		year,                   // current year so no change
 		time.Month(month+2),    // slide to next month, yields back as current month by the trick
 		0,                      // the essential part of this trick - 0-day!
@@ -63,7 +63,7 @@ func getDaysOfMonth(year int, month int) int {
 }
 
 func constructTimeBySchedule(schedule *schedule) time.Time {
-	return timeDate(
+	return time.Date(
 		schedule.year,
 		time.Month(schedule.month+1),
 		schedule.day+1,
@@ -80,45 +80,45 @@ func updateScheduleIndex(
 ) bool {
 	var reset bool
 	// get next second from schedule data
-	schedule.second, schedule.secondIndex, reset = moveValueIndexFunc(
+	schedule.second, schedule.secondIndex, reset = moveValueIndex(
 		schedule.secondIndex,
 		schedule.seconds,
 		60,
 	)
 	if reset {
 		// second reset, thus get next minute from schedule data
-		schedule.minute, schedule.minuteIndex, reset = moveValueIndexFunc(
+		schedule.minute, schedule.minuteIndex, reset = moveValueIndex(
 			schedule.minuteIndex,
 			schedule.minutes,
 			60,
 		)
 		if reset {
 			// minute reset, thus get next hour from schedule data
-			schedule.hour, schedule.hourIndex, reset = moveValueIndexFunc(
+			schedule.hour, schedule.hourIndex, reset = moveValueIndex(
 				schedule.hourIndex,
 				schedule.hours,
 				24,
 			)
 			if reset {
 				// hour reset, thus get next day from schedule data
-				schedule.day, schedule.dayIndex, reset = moveValueIndexFunc(
+				schedule.day, schedule.dayIndex, reset = moveValueIndex(
 					schedule.dayIndex,
 					schedule.days,
-					getDaysOfMonthFunc(
+					getDaysOfMonth(
 						schedule.year,
 						schedule.month,
 					),
 				)
 				if reset {
 					// day reset, thus get next month from schedule data
-					schedule.month, schedule.monthIndex, reset = moveValueIndexFunc(
+					schedule.month, schedule.monthIndex, reset = moveValueIndex(
 						schedule.monthIndex,
 						schedule.months,
 						12,
 					)
 					if reset {
 						// month reset, thus get next year from schedule data
-						schedule.year, schedule.yearIndex, reset = moveValueIndexFunc(
+						schedule.year, schedule.yearIndex, reset = moveValueIndex(
 							schedule.yearIndex,
 							schedule.years,
 							9999, // hopefully nobody is still using this library by year 9999?
@@ -134,7 +134,7 @@ func updateScheduleIndex(
 }
 
 func (schedule *schedule) NextSchedule() *time.Time {
-	var currentLocalTime = timeNow()
+	var currentLocalTime = time.Now()
 	if schedule.till != nil &&
 		schedule.till.Before(currentLocalTime) {
 		// causes the schedule to terminate
@@ -146,10 +146,10 @@ func (schedule *schedule) NextSchedule() *time.Time {
 			return nil
 		}
 		// load next schedule time
-		var timeNext = constructTimeByScheduleFunc(
+		var timeNext = constructTimeBySchedule(
 			schedule,
 		)
-		schedule.completed = updateScheduleIndexFunc(
+		schedule.completed = updateScheduleIndex(
 			schedule,
 		)
 		if currentLocalTime.Before(timeNext) {

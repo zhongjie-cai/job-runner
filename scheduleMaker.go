@@ -1,6 +1,8 @@
 package jobrunner
 
 import (
+	"fmt"
+	"sort"
 	"time"
 )
 
@@ -83,7 +85,7 @@ func generateFlagsData(data []bool, total int, values ...int) []bool {
 
 // OnSeconds sets up the scheduleMaker on second's level; if not called or called with no parameters, then every second is considered to be set up
 func (scheduleMaker *scheduleMaker) OnSeconds(seconds ...int) ScheduleMaker {
-	scheduleMaker.seconds = generateFlagsDataFunc(
+	scheduleMaker.seconds = generateFlagsData(
 		scheduleMaker.seconds,
 		60,
 		seconds...,
@@ -93,7 +95,7 @@ func (scheduleMaker *scheduleMaker) OnSeconds(seconds ...int) ScheduleMaker {
 
 // OnMinutes sets up the scheduleMaker on minute's level; if not called or called with no parameters, then every minute is considered to be set up
 func (scheduleMaker *scheduleMaker) OnMinutes(minutes ...int) ScheduleMaker {
-	scheduleMaker.minutes = generateFlagsDataFunc(
+	scheduleMaker.minutes = generateFlagsData(
 		scheduleMaker.minutes,
 		60,
 		minutes...,
@@ -103,7 +105,7 @@ func (scheduleMaker *scheduleMaker) OnMinutes(minutes ...int) ScheduleMaker {
 
 // AtHours sets up the scheduleMaker on hour's level; if not called or called with no parameters, then every hour is considered to be set up
 func (scheduleMaker *scheduleMaker) AtHours(hours ...int) ScheduleMaker {
-	scheduleMaker.hours = generateFlagsDataFunc(
+	scheduleMaker.hours = generateFlagsData(
 		scheduleMaker.hours,
 		24,
 		hours...,
@@ -117,7 +119,7 @@ func (scheduleMaker *scheduleMaker) OnWeekdays(weekdays ...time.Weekday) Schedul
 	for _, weekday := range weekdays {
 		weekdaysInInt = append(weekdaysInInt, int(weekday))
 	}
-	scheduleMaker.weekdays = generateFlagsDataFunc(
+	scheduleMaker.weekdays = generateFlagsData(
 		scheduleMaker.weekdays,
 		7,
 		weekdaysInInt...,
@@ -132,7 +134,7 @@ func (scheduleMaker *scheduleMaker) OnDays(days ...int) ScheduleMaker {
 		// due to the fact that day value start from 1 instead of 0...
 		daysInInt = append(daysInInt, day-1)
 	}
-	scheduleMaker.days = generateFlagsDataFunc(
+	scheduleMaker.days = generateFlagsData(
 		scheduleMaker.days,
 		31,
 		daysInInt...,
@@ -147,7 +149,7 @@ func (scheduleMaker *scheduleMaker) InMonths(months ...time.Month) ScheduleMaker
 		// due to the fact that month value start from 1 instead of 0...
 		monthsInInt = append(monthsInInt, int(month-1))
 	}
-	scheduleMaker.months = generateFlagsDataFunc(
+	scheduleMaker.months = generateFlagsData(
 		scheduleMaker.months,
 		12,
 		monthsInInt...,
@@ -229,7 +231,7 @@ func constructYearSlice(years map[int]bool) []int {
 	var data = []int{}
 	if len(years) == 0 {
 		// hard-code this to allow execution for 100 years if no year is specified
-		var currentTime = timeNow()
+		var currentTime = time.Now()
 		var currentYear = currentTime.Year()
 		for year := currentYear; year < currentYear+100; year++ {
 			data = append(data, year)
@@ -240,7 +242,7 @@ func constructYearSlice(years map[int]bool) []int {
 				data = append(data, year)
 			}
 		}
-		sortInts(data)
+		sort.Ints(data)
 	}
 	return data
 }
@@ -248,18 +250,18 @@ func constructYearSlice(years map[int]bool) []int {
 func constructScheduleTemplate(scheduleMaker *scheduleMaker) *schedule {
 	var schedule = &schedule{
 		secondIndex: 0,
-		seconds:     constructValueSliceFunc(scheduleMaker.seconds, 60),
+		seconds:     constructValueSlice(scheduleMaker.seconds, 60),
 		minuteIndex: 0,
-		minutes:     constructValueSliceFunc(scheduleMaker.minutes, 60),
+		minutes:     constructValueSlice(scheduleMaker.minutes, 60),
 		hourIndex:   0,
-		hours:       constructValueSliceFunc(scheduleMaker.hours, 24),
+		hours:       constructValueSlice(scheduleMaker.hours, 24),
 		dayIndex:    0,
-		days:        constructValueSliceFunc(scheduleMaker.days, 31),
+		days:        constructValueSlice(scheduleMaker.days, 31),
 		monthIndex:  0,
-		months:      constructValueSliceFunc(scheduleMaker.months, 12),
+		months:      constructValueSlice(scheduleMaker.months, 12),
 		yearIndex:   0,
-		years:       constructYearSliceFunc(scheduleMaker.years),
-		weekdays:    constructWeekdayMapFunc(scheduleMaker.weekdays),
+		years:       constructYearSlice(scheduleMaker.years),
+		weekdays:    constructWeekdayMap(scheduleMaker.weekdays),
 		till:        scheduleMaker.till,
 		timezone:    scheduleMaker.timezone,
 		skipOverdue: scheduleMaker.skipOverdue,
@@ -291,7 +293,7 @@ func isWeekdayMatch(year, month, day int, weekdays map[time.Weekday]bool) bool {
 	if len(weekdays) == 0 {
 		return true
 	}
-	var date = timeDate(
+	var date = time.Date(
 		year,
 		time.Month(month+1),
 		day+1,
@@ -311,15 +313,15 @@ func determineScheduleIndex(
 ) (bool, time.Time, error) {
 	var increment bool
 	var overflow bool
-	schedule.year, schedule.yearIndex, increment, overflow = findValueMatchFunc(
+	schedule.year, schedule.yearIndex, increment, overflow = findValueMatch(
 		start.Year(),
 		schedule.years,
 	)
 	if overflow {
-		return false, start, fmtErrorf("Invalid schedule configuration: no valid next execution time available")
+		return false, start, fmt.Errorf("Invalid schedule configuration: no valid next execution time available")
 	} else if increment {
 		return false,
-			timeDate(
+			time.Date(
 				schedule.year,
 				time.January,
 				1,
@@ -331,13 +333,13 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.month, schedule.monthIndex, increment, overflow = findValueMatchFunc(
+	schedule.month, schedule.monthIndex, increment, overflow = findValueMatch(
 		int(start.Month())-1,
 		schedule.months,
 	)
 	if overflow {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year()+1,
 				time.January,
 				1,
@@ -350,7 +352,7 @@ func determineScheduleIndex(
 			nil
 	} else if increment {
 		return false,
-			timeDate(
+			time.Date(
 				schedule.year,
 				time.Month(schedule.month+1),
 				1,
@@ -362,13 +364,13 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.day, schedule.dayIndex, increment, overflow = findValueMatchFunc(
+	schedule.day, schedule.dayIndex, increment, overflow = findValueMatch(
 		start.Day()-1,
 		schedule.days,
 	)
 	if overflow {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year(),
 				start.Month()+1,
 				1,
@@ -381,7 +383,7 @@ func determineScheduleIndex(
 			nil
 	} else if increment {
 		return false,
-			timeDate(
+			time.Date(
 				schedule.year,
 				time.Month(schedule.month+1),
 				schedule.day+1,
@@ -393,14 +395,14 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	if !isWeekdayMatchFunc(
+	if !isWeekdayMatch(
 		schedule.year,
 		schedule.month,
 		schedule.day,
 		schedule.weekdays,
 	) {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year(),
 				start.Month(),
 				start.Day()+1,
@@ -412,13 +414,13 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.hour, schedule.hourIndex, increment, overflow = findValueMatchFunc(
+	schedule.hour, schedule.hourIndex, increment, overflow = findValueMatch(
 		start.Hour(),
 		schedule.hours,
 	)
 	if overflow {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year(),
 				start.Month(),
 				start.Day()+1,
@@ -431,7 +433,7 @@ func determineScheduleIndex(
 			nil
 	} else if increment {
 		return false,
-			timeDate(
+			time.Date(
 				schedule.year,
 				time.Month(schedule.month+1),
 				schedule.day+1,
@@ -443,13 +445,13 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.minute, schedule.minuteIndex, increment, overflow = findValueMatchFunc(
+	schedule.minute, schedule.minuteIndex, increment, overflow = findValueMatch(
 		start.Minute(),
 		schedule.minutes,
 	)
 	if overflow {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year(),
 				start.Month(),
 				start.Day(),
@@ -462,7 +464,7 @@ func determineScheduleIndex(
 			nil
 	} else if increment {
 		return false,
-			timeDate(
+			time.Date(
 				schedule.year,
 				time.Month(schedule.month+1),
 				schedule.day+1,
@@ -474,13 +476,13 @@ func determineScheduleIndex(
 			),
 			nil
 	}
-	schedule.second, schedule.secondIndex, _, overflow = findValueMatchFunc(
+	schedule.second, schedule.secondIndex, _, overflow = findValueMatch(
 		start.Second(),
 		schedule.seconds,
 	)
 	if overflow {
 		return false,
-			timeDate(
+			time.Date(
 				start.Year(),
 				start.Month(),
 				start.Day(),
@@ -501,7 +503,7 @@ func initialiseSchedule(
 ) error {
 	var calcError error
 	for completed := false; !completed; {
-		completed, start, calcError = determineScheduleIndexFunc(
+		completed, start, calcError = determineScheduleIndex(
 			start,
 			schedule,
 		)
@@ -514,15 +516,15 @@ func initialiseSchedule(
 
 // Schedule returns a compiled schedule based on all previously configured settings
 func (scheduleMaker *scheduleMaker) Schedule() (Schedule, error) {
-	var start = timeNow()
+	var start = time.Now()
 	if scheduleMaker.from != nil &&
 		scheduleMaker.from.After(start) {
 		start = *scheduleMaker.from
 	}
-	var schedule = constructScheduleTemplateFunc(
+	var schedule = constructScheduleTemplate(
 		scheduleMaker,
 	)
-	var calcError = initialiseScheduleFunc(
+	var calcError = initialiseSchedule(
 		start,
 		schedule,
 	)

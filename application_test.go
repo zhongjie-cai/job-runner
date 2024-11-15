@@ -3,41 +3,44 @@ package jobrunner
 import (
 	"crypto/tls"
 	"errors"
-	"math/rand"
-	"net/http"
+	"fmt"
+	"math/rand/v2"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/zhongjie-cai/gomocker/v2"
 )
+
+func functionPointerEquals(expectFunc interface{}, actualFunc interface{}) bool {
+	var expectValue = fmt.Sprintf("%v", reflect.ValueOf(expectFunc))
+	var actualValue = fmt.Sprintf("%v", reflect.ValueOf(actualFunc))
+	return expectValue == actualValue
+}
+
+func assertFunctionEquals(t *testing.T, expectFunc interface{}, actualFunc interface{}) {
+	assert.True(t, functionPointerEquals(expectFunc, actualFunc))
+}
 
 func TestNewApplication_NilCustomization(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyVersion = "some version"
-	var dummyInstances = rand.Intn(100)
+	var dummyInstances = rand.IntN(100)
 	var dummySchedule Schedule
-	var dummyOverlap = rand.Intn(100) > 50
+	var dummyOverlap = rand.IntN(100) > 50
 	var dummyCustomization Customization
-	var dummySessionID = uuid.New()
+	var dummySessionID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, dummyCustomization, i)
-		return true
-	}
-	uuidNewExpected = 1
-	uuidNew = func() uuid.UUID {
-		uuidNewCalled++
-		return dummySessionID
-	}
+	m.Mock(isInterfaceValueNil).Expects(dummyCustomization).Returns(true).Once()
+	m.Mock(uuid.New).Expects().Returns(dummySessionID).Once()
 
 	// SUT
 	var result = NewApplication(
@@ -66,36 +69,27 @@ func TestNewApplication_NilCustomization(t *testing.T) {
 	assert.Empty(t, value.session.attachment)
 	assert.Equal(t, customizationDefault, value.session.customization)
 	assert.Equal(t, customizationDefault, value.customization)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestNewApplication_HasCustomization(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
 	var dummyVersion = "some version"
-	var dummyInstances = rand.Intn(100)
+	var dummyInstances = rand.IntN(100)
 	var dummySchedule Schedule
-	var dummyOverlap = rand.Intn(100) > 50
-	var dummyCustomization = &dummyCustomization{t: t}
+	var dummyOverlap = rand.IntN(100) > 50
+	type customization struct {
+		Customization
+	}
+	var dummyCustomization = &customization{}
 	var dummySessionID = uuid.New()
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, dummyCustomization, i)
-		return false
-	}
-	uuidNewExpected = 1
-	uuidNew = func() uuid.UUID {
-		uuidNewCalled++
-		return dummySessionID
-	}
+	m.Mock(isInterfaceValueNil).Expects(dummyCustomization).Returns(false).Once()
+	m.Mock(uuid.New).Expects().Returns(dummySessionID).Once()
 
 	// SUT
 	var result = NewApplication(
@@ -124,9 +118,6 @@ func TestNewApplication_HasCustomization(t *testing.T) {
 	assert.Empty(t, value.session.attachment)
 	assert.Equal(t, dummyCustomization, value.session.customization)
 	assert.Equal(t, dummyCustomization, value.customization)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestApplication_Start(t *testing.T) {
@@ -136,40 +127,27 @@ func TestApplication_Start(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	startApplicationFuncExpected = 1
-	startApplicationFunc = func(app *application) {
-		startApplicationFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
+	m.Mock(startApplication).Expects(dummyApplication).Returns().Once()
 
 	// SUT + act
 	dummyApplication.Start()
-
-	// verify
-	verifyAll(t)
 }
 
 func TestApplication_IsRunning(t *testing.T) {
 	// arrange
 	var dummyApplication = &application{
 		name:    "some name",
-		started: rand.Intn(100) > 50,
+		started: rand.IntN(100) > 50,
 	}
-
-	// mock
-	createMock(t)
 
 	// SUT + act
 	var result = dummyApplication.IsRunning()
 
 	// assert
 	assert.Equal(t, dummyApplication.started, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestApplication_LastErrors(t *testing.T) {
@@ -184,17 +162,11 @@ func TestApplication_LastErrors(t *testing.T) {
 		lastErrors: dummyLastErrors,
 	}
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	var result = dummyApplication.LastErrors()
 
 	// assert
 	assert.Equal(t, dummyApplication.lastErrors, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestApplication_Stop_NotStarted(t *testing.T) {
@@ -204,14 +176,8 @@ func TestApplication_Stop_NotStarted(t *testing.T) {
 		started: false,
 	}
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	dummyApplication.Stop()
-
-	// verify
-	verifyAll(t)
 }
 
 func TestApplication_Stop_HasStarted(t *testing.T) {
@@ -223,17 +189,11 @@ func TestApplication_Stop_HasStarted(t *testing.T) {
 		started:  true,
 	}
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	go dummyApplication.Stop()
 
 	// assert
 	assert.True(t, <-dummyShutdown)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestStartApplication_AlreadyStarted(t *testing.T) {
@@ -243,14 +203,8 @@ func TestStartApplication_AlreadyStarted(t *testing.T) {
 		started: true,
 	}
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	startApplication(dummyApplication)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestStartApplication_PreBootstrapingFailure(t *testing.T) {
@@ -260,21 +214,13 @@ func TestStartApplication_PreBootstrapingFailure(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	preBootstrapingFuncExpected = 1
-	preBootstrapingFunc = func(app *application) bool {
-		preBootstrapingFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		return false
-	}
+	m.Mock(preBootstraping).Expects(dummyApplication).Returns(false).Once()
 
 	// SUT + act
 	startApplication(dummyApplication)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestStartApplication_PostBootstrapingFailure(t *testing.T) {
@@ -284,32 +230,15 @@ func TestStartApplication_PostBootstrapingFailure(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	preBootstrapingFuncExpected = 1
-	preBootstrapingFunc = func(app *application) bool {
-		preBootstrapingFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		return true
-	}
-	bootstrapFuncExpected = 1
-	bootstrapFunc = func(app *application) {
-		bootstrapFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
-	postBootstrapingFuncExpected = 1
-	postBootstrapingFunc = func(app *application) bool {
-		postBootstrapingFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		return false
-	}
+	m.Mock(preBootstraping).Expects(dummyApplication).Returns(true).Once()
+	m.Mock(bootstrap).Expects(dummyApplication).Returns().Once()
+	m.Mock(postBootstraping).Expects(dummyApplication).Returns(false).Once()
 
 	// SUT + act
 	startApplication(dummyApplication)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestStartApplication_HappyPath(t *testing.T) {
@@ -319,55 +248,17 @@ func TestStartApplication_HappyPath(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	preBootstrapingFuncExpected = 1
-	preBootstrapingFunc = func(app *application) bool {
-		preBootstrapingFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		return true
-	}
-	bootstrapFuncExpected = 1
-	bootstrapFunc = func(app *application) {
-		bootstrapFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
-	postBootstrapingFuncExpected = 1
-	postBootstrapingFunc = func(app *application) bool {
-		postBootstrapingFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		return true
-	}
-	beginApplicationFuncExpected = 1
-	beginApplicationFunc = func(app *application) {
-		beginApplicationFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
-	endApplicationFuncExpected = 1
-	endApplicationFunc = func(app *application) {
-		endApplicationFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
+	m.Mock(preBootstraping).Expects(dummyApplication).Returns(true).Once()
+	m.Mock(bootstrap).Expects(dummyApplication).Returns().Once()
+	m.Mock(postBootstraping).Expects(dummyApplication).Returns(true).Once()
+	m.Mock(beginApplication).Expects(dummyApplication).Returns().Once()
+	m.Mock(endApplication).Expects(dummyApplication).Returns().Once()
 
 	// SUT + act
 	startApplication(dummyApplication)
-
-	// verify
-	verifyAll(t)
-}
-
-type dummyCustomizationPreBootstrapping struct {
-	dummyCustomization
-	preBootstrap func() error
-}
-
-func (customization *dummyCustomizationPreBootstrapping) PreBootstrap() error {
-	if customization.preBootstrap != nil {
-		return customization.preBootstrap()
-	}
-	assert.Fail(customization.t, "Unexpected call to PreBootstrap")
-	return nil
 }
 
 func TestPreBootstraping_Error(t *testing.T) {
@@ -375,37 +266,24 @@ func TestPreBootstraping_Error(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationPreBootstrapping{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationPreBootstrapExpected int
-	var customizationPreBootstrapCalled int
 	var dummyError = errors.New("some error")
 	var dummyMessageFormat = "Failed to execute customization.PreBootstrap. Error: %+v"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationPreBootstrapExpected = 1
-	dummyCustomization.preBootstrap = func() error {
-		customizationPreBootstrapCalled++
-		return dummyError
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "preBootstraping", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyError, parameters[0])
-	}
+	m.Mock((*customization).PreBootstrap).Expects(dummyCustomization).Returns(dummyError).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "preBootstraping",
+		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
 	var result = preBootstraping(
@@ -414,12 +292,8 @@ func TestPreBootstraping_Error(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
-	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 1)
 	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationPreBootstrapExpected, customizationPreBootstrapCalled, "Unexpected number of calls to method customization.PreBootstrap")
 }
 
 func TestPreBootstraping_Success(t *testing.T) {
@@ -427,35 +301,23 @@ func TestPreBootstraping_Success(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationPreBootstrapping{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationPreBootstrapExpected int
-	var customizationPreBootstrapCalled int
 	var dummyMessageFormat = "customization.PreBootstrap executed successfully"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationPreBootstrapExpected = 1
-	dummyCustomization.preBootstrap = func() error {
-		customizationPreBootstrapCalled++
-		return nil
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "preBootstraping", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Empty(t, parameters)
-	}
+	m.Mock((*customization).PreBootstrap).Expects(dummyCustomization).Returns(nil).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application",
+		"preBootstraping", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	var result = preBootstraping(
@@ -465,50 +327,6 @@ func TestPreBootstraping_Success(t *testing.T) {
 	// assert
 	assert.True(t, result)
 	assert.Empty(t, dummyApplication.lastErrors)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationPreBootstrapExpected, customizationPreBootstrapCalled, "Unexpected number of calls to method customization.PreBootstrap")
-}
-
-type dummyCustomizationBootstrap struct {
-	dummyCustomization
-	clientCert                 func() *tls.Certificate
-	defaultTimeout             func() time.Duration
-	skipServerCertVerification func() bool
-	roundTripper               func(http.RoundTripper) http.RoundTripper
-}
-
-func (customization *dummyCustomizationBootstrap) ClientCert() *tls.Certificate {
-	if customization.clientCert != nil {
-		return customization.clientCert()
-	}
-	assert.Fail(customization.t, "Unexpected call to ClientCert")
-	return nil
-}
-
-func (customization *dummyCustomizationBootstrap) DefaultTimeout() time.Duration {
-	if customization.defaultTimeout != nil {
-		return customization.defaultTimeout()
-	}
-	assert.Fail(customization.t, "Unexpected call to DefaultTimeout")
-	return 0
-}
-
-func (customization *dummyCustomizationBootstrap) SkipServerCertVerification() bool {
-	if customization.skipServerCertVerification != nil {
-		return customization.skipServerCertVerification()
-	}
-	assert.Fail(customization.t, "Unexpected call to SkipServerCertVerification")
-	return false
-}
-
-func (customization *dummyCustomizationBootstrap) RoundTripper(originalTransport http.RoundTripper) http.RoundTripper {
-	if customization.roundTripper != nil {
-		return customization.roundTripper(originalTransport)
-	}
-	assert.Fail(customization.t, "Unexpected call to RoundTripper")
-	return nil
 }
 
 func TestBootstrap_HappyPath(t *testing.T) {
@@ -516,94 +334,34 @@ func TestBootstrap_HappyPath(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationBootstrap{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationDefaultTimeoutExpected int
-	var customizationDefaultTimeoutCalled int
-	var customizationSkipServerCertVerificationExpected int
-	var customizationSkipServerCertVerificationCalled int
-	var customizationClientCertExpected int
-	var customizationClientCertCalled int
-	var customizationRoundTripperExpected int
-	var customizationRoundTripperCalled int
-	var dummyWebcallTimeout = time.Duration(rand.Intn(100))
-	var dummySkipCertVerification = rand.Intn(100) > 50
+	var dummyWebcallTimeout = time.Duration(rand.IntN(100))
+	var dummySkipCertVerification = rand.IntN(100) > 50
 	var dummyClientCertificate = &tls.Certificate{Certificate: [][]byte{{0}}}
-	var dummyOriginalTransport = &dummyTransport{t: t}
 	var dummyMessageFormat = "Application bootstrapped successfully"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	initializeHTTPClientsFuncExpected = 1
-	initializeHTTPClientsFunc = func(webcallTimeout time.Duration, skipServerCertVerification bool, clientCertificate *tls.Certificate, roundTripperWrapper func(originalTransport http.RoundTripper) http.RoundTripper) {
-		initializeHTTPClientsFuncCalled++
-		assert.Equal(t, dummyWebcallTimeout, webcallTimeout)
-		assert.Equal(t, dummySkipCertVerification, skipServerCertVerification)
-		assert.Equal(t, dummyClientCertificate, clientCertificate)
-		roundTripperWrapper(dummyOriginalTransport)
-	}
-	customizationDefaultTimeoutExpected = 1
-	dummyCustomization.defaultTimeout = func() time.Duration {
-		customizationDefaultTimeoutCalled++
-		return dummyWebcallTimeout
-	}
-	customizationSkipServerCertVerificationExpected = 1
-	dummyCustomization.skipServerCertVerification = func() bool {
-		customizationSkipServerCertVerificationCalled++
-		return dummySkipCertVerification
-	}
-	customizationClientCertExpected = 1
-	dummyCustomization.clientCert = func() *tls.Certificate {
-		customizationClientCertCalled++
-		return dummyClientCertificate
-	}
-	customizationRoundTripperExpected = 1
-	dummyCustomization.roundTripper = func(originalTransport http.RoundTripper) http.RoundTripper {
-		customizationRoundTripperCalled++
-		assert.Equal(t, dummyOriginalTransport, originalTransport)
-		return originalTransport
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "bootstrap", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Empty(t, parameters)
-	}
+	m.Mock(initializeHTTPClients).Expects(dummyWebcallTimeout, dummySkipCertVerification,
+		dummyClientCertificate, gomocker.Anything()).Returns().Once()
+	m.Mock((*customization).DefaultTimeout).Expects(dummyCustomization).Returns(dummyWebcallTimeout).Once()
+	m.Mock((*customization).SkipServerCertVerification).Expects(dummyCustomization).Returns(dummySkipCertVerification).Once()
+	m.Mock((*customization).ClientCert).Expects(dummyCustomization).Returns(dummyClientCertificate).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "bootstrap", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	bootstrap(
 		dummyApplication,
 	)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationDefaultTimeoutExpected, customizationDefaultTimeoutCalled, "Unexpected number of calls to method customization.DefaultTimeout")
-	assert.Equal(t, customizationSkipServerCertVerificationExpected, customizationSkipServerCertVerificationCalled, "Unexpected number of calls to method customization.SkipServerCertVerification")
-	assert.Equal(t, customizationClientCertExpected, customizationClientCertCalled, "Unexpected number of calls to method customization.ClientCert")
-	assert.Equal(t, customizationRoundTripperExpected, customizationRoundTripperCalled, "Unexpected number of calls to method customization.RoundTripper")
-}
-
-type dummyCustomizationPostBootstrapping struct {
-	dummyCustomization
-	postBootstrap func() error
-}
-
-func (customization *dummyCustomizationPostBootstrapping) PostBootstrap() error {
-	if customization.postBootstrap != nil {
-		return customization.postBootstrap()
-	}
-	assert.Fail(customization.t, "Unexpected call to PostBootstrap")
-	return nil
 }
 
 func TestPostBootstraping_Error(t *testing.T) {
@@ -611,37 +369,24 @@ func TestPostBootstraping_Error(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationPostBootstrapping{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationPostBootstrapExpected int
-	var customizationPostBootstrapCalled int
 	var dummyError = errors.New("some error")
 	var dummyMessageFormat = "Failed to execute customization.PostBootstrap. Error: %+v"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationPostBootstrapExpected = 1
-	dummyCustomization.postBootstrap = func() error {
-		customizationPostBootstrapCalled++
-		return dummyError
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "postBootstraping", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyError, parameters[0])
-	}
+	m.Mock((*customization).PostBootstrap).Expects(dummyCustomization).Returns(dummyError).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "postBootstraping",
+		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
 	var result = postBootstraping(
@@ -650,12 +395,8 @@ func TestPostBootstraping_Error(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
-	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 1)
 	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationPostBootstrapExpected, customizationPostBootstrapCalled, "Unexpected number of calls to method customization.PostBootstrap")
 }
 
 func TestPostBootstraping_Success(t *testing.T) {
@@ -663,35 +404,23 @@ func TestPostBootstraping_Success(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationPostBootstrapping{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationPostBootstrapExpected int
-	var customizationPostBootstrapCalled int
 	var dummyMessageFormat = "customization.PostBootstrap executed successfully"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationPostBootstrapExpected = 1
-	dummyCustomization.postBootstrap = func() error {
-		customizationPostBootstrapCalled++
-		return nil
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "postBootstraping", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Empty(t, parameters)
-	}
+	m.Mock((*customization).PostBootstrap).Expects(dummyCustomization).Returns(nil).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application",
+		"postBootstraping", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	var result = postBootstraping(
@@ -701,15 +430,14 @@ func TestPostBootstraping_Success(t *testing.T) {
 	// assert
 	assert.True(t, result)
 	assert.Empty(t, dummyApplication.lastErrors)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationPostBootstrapExpected, customizationPostBootstrapCalled, "Unexpected number of calls to method customization.PostBootstrap")
 }
 
 func TestWaitForNextRun_NilNextSchedule(t *testing.T) {
 	// arrange
-	var dummySchedule = &dummySchedule{t: t}
+	type schedule struct {
+		Schedule
+	}
+	var dummySchedule = &schedule{}
 	var dummySession = &session{id: uuid.New()}
 	var dummyApplication = &application{
 		name:     "some name",
@@ -719,27 +447,14 @@ func TestWaitForNextRun_NilNextSchedule(t *testing.T) {
 	}
 	var dummyTimeNext *time.Time
 	var dummyMessageFormat = "No next schedule available, terminating execution"
-	var scheduleNextScheduleExpected int
-	var scheduleNextScheduleCalled int
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	scheduleNextScheduleExpected = 1
-	dummySchedule.nextSchedule = func() *time.Time {
-		scheduleNextScheduleCalled++
-		return dummyTimeNext
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category, subcategory, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "waitForNextRun", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Empty(t, parameters)
-	}
+	m.Mock((*schedule).NextSchedule).Expects(dummySchedule).Returns(dummyTimeNext).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application",
+		"waitForNextRun", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	waitForNextRun(
@@ -748,15 +463,14 @@ func TestWaitForNextRun_NilNextSchedule(t *testing.T) {
 
 	// assert
 	assert.False(t, dummyApplication.started)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, scheduleNextScheduleExpected, scheduleNextScheduleCalled, "Unexpected number of calls to schedule.Wait")
 }
 
 func TestWaitForNextRun_ValidNextSchedule(t *testing.T) {
 	// arrange
-	var dummySchedule = &dummySchedule{t: t}
+	type schedule struct {
+		Schedule
+	}
+	var dummySchedule = &schedule{}
 	var dummySession = &session{id: uuid.New()}
 	var dummyApplication = &application{
 		name:     "some name",
@@ -764,44 +478,20 @@ func TestWaitForNextRun_ValidNextSchedule(t *testing.T) {
 		session:  dummySession,
 	}
 	var dummyTimeNow = time.Now()
-	var dummyDuration = time.Duration(rand.Intn(1000)) + 10*time.Second
+	var dummyDuration = time.Duration(rand.IntN(1000)) + 10*time.Second
 	var dummyTimeNext = dummyTimeNow.Add(dummyDuration)
 	var dummyMessageFormat = "Next run at [%v]: waiting for [%v]"
 	var dummyControlChannel = make(chan time.Time)
-	var scheduleNextScheduleExpected int
-	var scheduleNextScheduleCalled int
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	scheduleNextScheduleExpected = 1
-	dummySchedule.nextSchedule = func() *time.Time {
-		scheduleNextScheduleCalled++
-		return &dummyTimeNext
-	}
-	timeNowExpected = 1
-	timeNow = func() time.Time {
-		timeNowCalled++
-		return dummyTimeNow
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category, subcategory, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "waitForNextRun", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Equal(t, 2, len(parameters))
-		assert.Equal(t, dummyTimeNext, parameters[0])
-		assert.Equal(t, dummyDuration, parameters[1])
-	}
-	timeAfterExpected = 1
-	timeAfter = func(d time.Duration) <-chan time.Time {
-		timeAfterCalled++
-		assert.Equal(t, dummyDuration, d)
-		return dummyControlChannel
-	}
+	m.Mock((*schedule).NextSchedule).Expects(dummySchedule).Returns(&dummyTimeNext).Once()
+	m.Mock(time.Now).Expects().Returns(dummyTimeNow).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "waitForNextRun",
+		dummyMessageFormat, dummyTimeNext, dummyDuration).Returns().Once()
+	m.Mock(time.After).Expects(dummyDuration).Returns(dummyControlChannel).Once()
 
 	// SUT + act
 	go waitForNextRun(
@@ -810,31 +500,21 @@ func TestWaitForNextRun_ValidNextSchedule(t *testing.T) {
 
 	// push
 	dummyControlChannel <- dummyTimeNext
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, scheduleNextScheduleExpected, scheduleNextScheduleCalled, "Unexpected number of calls to schedule.Wait")
 }
 
 func TestRunInstances_ZeroInstance(t *testing.T) {
 	// arrange
 	var dummyApplication = &application{}
 
-	// mock
-	createMock(t)
-
 	// SUT + act
 	runInstances(
 		dummyApplication,
 	)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestRunInstances_SingleInstance(t *testing.T) {
 	// arrange
-	var dummyReruns = rand.Int31n(65535)
+	var dummyReruns = rand.Int32N(65535)
 	var dummyApplication = &application{
 		instances: 1,
 		reruns:    []int32{dummyReruns},
@@ -842,17 +522,10 @@ func TestRunInstances_SingleInstance(t *testing.T) {
 	var dummyError = errors.New("some error")
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	handleSessionFuncExpected = 1
-	handleSessionFunc = func(app *application, index int, reruns int) error {
-		handleSessionFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		assert.Equal(t, 0, index)
-		assert.Equal(t, int(dummyReruns)+1, reruns)
-		return dummyError
-	}
+	m.Mock(handleSession).Expects(dummyApplication, 0, int(dummyReruns)+1).Returns(dummyError).Once()
 
 	// SUT + act
 	runInstances(
@@ -860,11 +533,8 @@ func TestRunInstances_SingleInstance(t *testing.T) {
 	)
 
 	// assert
-	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 1)
 	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
-
-	// verify
-	verifyAll(t)
 }
 
 func TestRunInstances_MultipleInstances(t *testing.T) {
@@ -875,25 +545,31 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 		errors.New("some error 3"),
 	}
 	var dummyApplication = &application{
-		instances: len(dummyErrors),
-		reruns:    make([]int32, len(dummyErrors)),
+		instances: 3,
+		reruns:    make([]int32, 3),
 	}
-	var expectedIndex = map[int]bool{}
-	var writeLock sync.Mutex
+	var calls = map[int]bool{}
+	var lock = sync.RWMutex{}
+
+	// stub
+	var callChecker = func(value interface{}) bool {
+		lock.Lock()
+		defer lock.Unlock()
+		var called, found = calls[value.(int)]
+		if found || called {
+			return false
+		}
+		calls[value.(int)] = true
+		return true
+	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	handleSessionFuncExpected = dummyApplication.instances
-	handleSessionFunc = func(app *application, index int, reruns int) error {
-		handleSessionFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		writeLock.Lock()
-		expectedIndex[index] = true
-		writeLock.Unlock()
-		return dummyErrors[index]
-	}
+	m.Mock(handleSession).Expects(dummyApplication, gomocker.Matches(callChecker), 1).Returns(dummyErrors[0]).Once()
+	m.Mock(handleSession).Expects(dummyApplication, gomocker.Matches(callChecker), 1).Returns(dummyErrors[1]).Once()
+	m.Mock(handleSession).Expects(dummyApplication, gomocker.Matches(callChecker), 1).Returns(dummyErrors[2]).Once()
 
 	// SUT + act
 	runInstances(
@@ -901,20 +577,13 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	)
 
 	// assert
-	assert.Equal(t, dummyApplication.instances, len(expectedIndex))
-	assert.True(t, expectedIndex[0])
-	assert.True(t, expectedIndex[1])
-	assert.True(t, expectedIndex[2])
-	assert.Equal(t, dummyApplication.instances, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 3)
 	assert.ElementsMatch(t, dummyErrors, dummyApplication.lastErrors)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestRunInstances_Overlap(t *testing.T) {
 	// arrange
-	var dummyReruns = rand.Int31n(65535)
+	var dummyReruns = rand.Int32N(65535)
 	var dummyApplication = &application{
 		instances: 1,
 		reruns:    []int32{dummyReruns},
@@ -926,17 +595,10 @@ func TestRunInstances_Overlap(t *testing.T) {
 	dummyApplication.waits.Add(1)
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	handleSessionFuncExpected = 1
-	handleSessionFunc = func(app *application, index int, reruns int) error {
-		handleSessionFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		assert.Equal(t, 0, index)
-		assert.Equal(t, int(dummyReruns)+1, reruns)
-		return dummyError
-	}
+	m.Mock(handleSession).Expects(dummyApplication, 0, int(dummyReruns)+1).Returns(dummyError).Once()
 
 	// SUT + act
 	runInstances(
@@ -944,11 +606,8 @@ func TestRunInstances_Overlap(t *testing.T) {
 	)
 
 	// assert
-	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 1)
 	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
-
-	// verify
-	verifyAll(t)
 }
 
 func TestScheduleExecution_WithOverlap(t *testing.T) {
@@ -958,36 +617,25 @@ func TestScheduleExecution_WithOverlap(t *testing.T) {
 		started: true,
 		overlap: true,
 	}
-	var controlFlag = make(chan bool)
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	waitForNextRunFuncExpected = 2
-	waitForNextRunFunc = func(app *application) {
-		waitForNextRunFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		app.started = (waitForNextRunFuncCalled < waitForNextRunFuncExpected)
-		<-controlFlag
-	}
-	runInstancesFuncExpected = 1
-	runInstancesFunc = func(app *application) {
-		runInstancesFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		controlFlag <- true
-	}
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().Once()
+	m.Mock(runInstances).Expects(dummyApplication).Returns().SideEffect(
+		func(index int, params ...interface{}) {
+			dummyApplication.waits.Done()
+		}).Once()
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffect(
+		func(index int, params ...interface{}) {
+			dummyApplication.started = false
+		}).Once()
 
 	// SUT + act
-	go scheduleExecution(
+	scheduleExecution(
 		dummyApplication,
 	)
-
-	// push
-	controlFlag <- true
-
-	// verify
-	verifyAll(t)
 }
 
 func TestScheduleExecution_NoOverlap(t *testing.T) {
@@ -999,34 +647,28 @@ func TestScheduleExecution_NoOverlap(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	waitForNextRunFuncExpected = 2
-	waitForNextRunFunc = func(app *application) {
-		waitForNextRunFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-		app.started = (waitForNextRunFuncCalled < waitForNextRunFuncExpected)
-	}
-	runInstancesFuncExpected = 1
-	runInstancesFunc = func(app *application) {
-		runInstancesFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().Once()
+	m.Mock(runInstances).Expects(dummyApplication).Returns().Once()
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffect(func(index int, params ...interface{}) {
+		dummyApplication.started = false
+	}).Once()
 
 	// SUT + act
 	scheduleExecution(
 		dummyApplication,
 	)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestRunApplication_NoSchedule(t *testing.T) {
 	// arrange
 	var dummyShutdown = make(chan bool)
-	var dummySchedule = &dummySchedule{t: t}
+	type schedule struct {
+		Schedule
+	}
+	var dummySchedule = &schedule{}
 	var dummyApplication = &application{
 		name:     "some name",
 		shutdown: dummyShutdown,
@@ -1034,20 +676,11 @@ func TestRunApplication_NoSchedule(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, dummySchedule, i)
-		return true
-	}
-	runInstancesFuncExpected = 1
-	runInstancesFunc = func(app *application) {
-		runInstancesFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
+	m.Mock(isInterfaceValueNil).Expects(dummySchedule).Returns(true).Once()
+	m.Mock(runInstances).Expects(dummyApplication).Returns().Once()
 
 	// SUT + act
 	go runApplication(
@@ -1056,15 +689,15 @@ func TestRunApplication_NoSchedule(t *testing.T) {
 
 	// assert
 	assert.True(t, <-dummyShutdown)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestRunApplication_WithSchedule(t *testing.T) {
 	// arrange
 	var dummyShutdown = make(chan bool)
-	var dummySchedule = &dummySchedule{t: t}
+	type schedule struct {
+		Schedule
+	}
+	var dummySchedule = &schedule{}
 	var dummyApplication = &application{
 		name:     "some name",
 		shutdown: dummyShutdown,
@@ -1072,20 +705,11 @@ func TestRunApplication_WithSchedule(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	isInterfaceValueNilFuncExpected = 1
-	isInterfaceValueNilFunc = func(i interface{}) bool {
-		isInterfaceValueNilFuncCalled++
-		assert.Equal(t, dummySchedule, i)
-		return false
-	}
-	scheduleExecutionFuncExpected = 1
-	scheduleExecutionFunc = func(app *application) {
-		scheduleExecutionFuncCalled++
-		assert.Equal(t, dummyApplication, app)
-	}
+	m.Mock(isInterfaceValueNil).Expects(dummySchedule).Returns(false).Once()
+	m.Mock(scheduleExecution).Expects(dummyApplication).Returns().Once()
 
 	// SUT + act
 	go runApplication(
@@ -1094,9 +718,6 @@ func TestRunApplication_WithSchedule(t *testing.T) {
 
 	// assert
 	assert.True(t, <-dummyShutdown)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestBeginApplication_HappyPath(t *testing.T) {
@@ -1113,32 +734,15 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 	}
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	runApplicationFuncExpected = 1
-	runApplicationFunc = func(app *application) {
-		runApplicationFuncCalled++
-		assert.True(t, dummyApplication.started)
-		assert.Equal(t, dummyApplication, app)
+	m.Mock(runApplication).Expects(dummyApplication).Returns().SideEffect(func(index int, params ...interface{}) {
 		dummyShutdown <- true
-	}
-	logAppRootFuncExpected = 2
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "beginApplication", subcategory)
-		if logAppRootFuncCalled == 1 {
-			assert.Equal(t, "Trying to start runner [%v] (v-%v)", messageFormat)
-			assert.Equal(t, 2, len(parameters))
-			assert.Equal(t, dummyName, parameters[0])
-			assert.Equal(t, dummyVersion, parameters[1])
-		} else if logAppRootFuncCalled == 2 {
-			assert.Equal(t, "Runner terminated", messageFormat)
-			assert.Empty(t, parameters)
-		}
-	}
+	}).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication",
+		"Trying to start runner [%v] (v-%v)", dummyName, dummyVersion).Returns().Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication", "Runner terminated").Returns().Once()
 
 	// SUT + act
 	beginApplication(
@@ -1147,22 +751,6 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 
 	// assert
 	assert.False(t, dummyApplication.started)
-
-	// verify
-	verifyAll(t)
-}
-
-type dummyCustomizationEndApplication struct {
-	dummyCustomization
-	appClosing func() error
-}
-
-func (customization *dummyCustomizationEndApplication) AppClosing() error {
-	if customization.appClosing != nil {
-		return customization.appClosing()
-	}
-	assert.Fail(customization.t, "Unexpected call to AppClosing")
-	return nil
 }
 
 func TestEndApplication_Error(t *testing.T) {
@@ -1170,37 +758,24 @@ func TestEndApplication_Error(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationEndApplication{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationAppClosingExpected int
-	var customizationAppClosingCalled int
 	var dummyError = errors.New("some error")
 	var dummyMessageFormat = "Failed to execute customization.AppClosing. Error: %+v"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationAppClosingExpected = 1
-	dummyCustomization.appClosing = func() error {
-		customizationAppClosingCalled++
-		return dummyError
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "endApplication", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Equal(t, 1, len(parameters))
-		assert.Equal(t, dummyError, parameters[0])
-	}
+	m.Mock((*customization).AppClosing).Expects(dummyCustomization).Returns(dummyError).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application", "endApplication",
+		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
 	endApplication(
@@ -1208,12 +783,8 @@ func TestEndApplication_Error(t *testing.T) {
 	)
 
 	// assert
-	assert.Equal(t, 1, len(dummyApplication.lastErrors))
+	assert.Len(t, dummyApplication.lastErrors, 1)
 	assert.Equal(t, dummyError, dummyApplication.lastErrors[0])
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationAppClosingExpected, customizationAppClosingCalled, "Unexpected number of calls to method customization.AppClosing")
 }
 
 func TestEndApplication_Success(t *testing.T) {
@@ -1221,35 +792,23 @@ func TestEndApplication_Success(t *testing.T) {
 	var dummySession = &session{
 		id: uuid.New(),
 	}
-	var dummyCustomization = &dummyCustomizationEndApplication{
-		dummyCustomization: dummyCustomization{t: t},
+	type customization struct {
+		Customization
 	}
+	var dummyCustomization = &customization{}
 	var dummyApplication = &application{
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
-	var customizationAppClosingExpected int
-	var customizationAppClosingCalled int
 	var dummyMessageFormat = "customization.AppClosing executed successfully"
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	customizationAppClosingExpected = 1
-	dummyCustomization.appClosing = func() error {
-		customizationAppClosingCalled++
-		return nil
-	}
-	logAppRootFuncExpected = 1
-	logAppRootFunc = func(session *session, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-		logAppRootFuncCalled++
-		assert.Equal(t, dummySession, session)
-		assert.Equal(t, "application", category)
-		assert.Equal(t, "endApplication", subcategory)
-		assert.Equal(t, dummyMessageFormat, messageFormat)
-		assert.Empty(t, parameters)
-	}
+	m.Mock((*customization).AppClosing).Expects(dummyCustomization).Returns(nil).Once()
+	m.Mock(logAppRoot).Expects(dummySession, "application",
+		"endApplication", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	endApplication(
@@ -1258,8 +817,4 @@ func TestEndApplication_Success(t *testing.T) {
 
 	// assert
 	assert.Empty(t, dummyApplication.lastErrors)
-
-	// verify
-	verifyAll(t)
-	assert.Equal(t, customizationAppClosingExpected, customizationAppClosingCalled, "Unexpected number of calls to method customization.AppClosing")
 }

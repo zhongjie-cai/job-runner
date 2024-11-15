@@ -1,9 +1,14 @@
 package jobrunner
 
 import (
+	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,15 +24,6 @@ func getClientForRequest(sendClientCert bool) *http.Client {
 	return httpClientNoCert
 }
 
-func clientDo(
-	httpClient *http.Client,
-	httpRequest *http.Request,
-) (*http.Response, error) {
-	return httpClient.Do(
-		httpRequest,
-	)
-}
-
 func clientDoWithRetry(
 	httpClient *http.Client,
 	httpRequest *http.Request,
@@ -38,8 +34,7 @@ func clientDoWithRetry(
 	var responseObject *http.Response
 	var responseError error
 	for {
-		responseObject, responseError = clientDoFunc(
-			httpClient,
+		responseObject, responseError = httpClient.Do(
 			httpRequest,
 		)
 		if responseError != nil {
@@ -56,7 +51,7 @@ func clientDoWithRetry(
 		} else {
 			break
 		}
-		timeSleep(
+		time.Sleep(
 			retryDelay,
 		)
 	}
@@ -93,11 +88,11 @@ func initializeHTTPClients(
 	roundTripperWrapper func(originalTransport http.RoundTripper) http.RoundTripper,
 ) {
 	httpClientWithCert = &http.Client{
-		Transport: getHTTPTransportFunc(skipServerCertVerification, clientCertificate, roundTripperWrapper),
+		Transport: getHTTPTransport(skipServerCertVerification, clientCertificate, roundTripperWrapper),
 		Timeout:   webcallTimeout,
 	}
 	httpClientNoCert = &http.Client{
-		Transport: getHTTPTransportFunc(skipServerCertVerification, nil, roundTripperWrapper),
+		Transport: getHTTPTransport(skipServerCertVerification, nil, roundTripperWrapper),
 		Timeout:   webcallTimeout,
 	}
 }
@@ -196,15 +191,15 @@ func createQueryString(
 		for _, value := range values {
 			queryStrings = append(
 				queryStrings,
-				fmtSprintf(
+				fmt.Sprintf(
 					"%v=%v",
-					urlQueryEscape(name),
-					urlQueryEscape(value),
+					url.QueryEscape(name),
+					url.QueryEscape(value),
 				),
 			)
 		}
 	}
-	return stringsJoin(
+	return strings.Join(
 		queryStrings,
 		"&",
 	)
@@ -217,13 +212,13 @@ func generateRequestURL(
 	if len(query) == 0 {
 		return baseURL
 	}
-	var queryString = createQueryStringFunc(
+	var queryString = createQueryString(
 		query,
 	)
 	if queryString == "" {
 		return baseURL
 	}
-	return fmtSprintf(
+	return fmt.Sprintf(
 		"%v?%v",
 		baseURL,
 		queryString,
@@ -233,16 +228,16 @@ func generateRequestURL(
 func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 	if webRequest == nil ||
 		webRequest.session == nil {
-		return nil, fmtErrorf("WebRequest is nil or contains invalid session")
+		return nil, fmt.Errorf("WebRequest is nil or contains invalid session")
 	}
-	var requestURL = generateRequestURLFunc(
+	var requestURL = generateRequestURL(
 		webRequest.url,
 		webRequest.query,
 	)
-	var requestBody = stringsNewReader(
+	var requestBody = strings.NewReader(
 		webRequest.payload,
 	)
-	var requestObject, requestError = httpNewRequest(
+	var requestObject, requestError = http.NewRequest(
 		webRequest.method,
 		requestURL,
 		requestBody,
@@ -250,13 +245,13 @@ func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 	if requestError != nil {
 		return nil, requestError
 	}
-	logWebcallStartFunc(
+	logWebcallStart(
 		webRequest.session,
 		webRequest.method,
 		webRequest.url,
 		requestURL,
 	)
-	logWebcallRequestFunc(
+	logWebcallRequest(
 		webRequest.session,
 		"Payload",
 		"Content",
@@ -268,11 +263,11 @@ func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 			requestObject.Header.Add(name, value)
 		}
 	}
-	logWebcallRequestFunc(
+	logWebcallRequest(
 		webRequest.session,
 		"Header",
 		"Content",
-		marshalIgnoreErrorFunc(
+		marshalIgnoreError(
 			requestObject.Header,
 		),
 	)
@@ -283,19 +278,19 @@ func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 }
 
 func logErrorResponse(session *session, responseError error, startTime time.Time) {
-	logWebcallResponseFunc(
+	logWebcallResponse(
 		session,
 		"Error",
 		"Content",
 		"%+v",
 		responseError,
 	)
-	logWebcallFinishFunc(
+	logWebcallFinish(
 		session,
 		"Error",
 		"-1",
 		"%s",
-		timeSince(startTime),
+		time.Since(startTime),
 	)
 }
 
@@ -305,54 +300,54 @@ func logSuccessResponse(session *session, response *http.Response, startTime tim
 	}
 	var (
 		responseStatusCode = response.StatusCode
-		responseBody, _    = ioutilReadAll(response.Body)
+		responseBody, _    = io.ReadAll(response.Body)
 		responseHeaders    = response.Header
 	)
 	response.Body.Close()
-	response.Body = ioutilNopCloser(
-		bytesNewBuffer(
+	response.Body = io.NopCloser(
+		bytes.NewBuffer(
 			responseBody,
 		),
 	)
-	logWebcallResponseFunc(
+	logWebcallResponse(
 		session,
 		"Header",
 		"Content",
-		marshalIgnoreErrorFunc(
+		marshalIgnoreError(
 			responseHeaders,
 		),
 	)
-	logWebcallResponseFunc(
+	logWebcallResponse(
 		session,
 		"Body",
 		"Content",
 		string(responseBody),
 	)
-	logWebcallFinishFunc(
+	logWebcallFinish(
 		session,
-		httpStatusText(responseStatusCode),
-		strconvItoa(responseStatusCode),
+		http.StatusText(responseStatusCode),
+		strconv.Itoa(responseStatusCode),
 		"%s",
-		timeSince(startTime),
+		time.Since(startTime),
 	)
 }
 
 func doRequestProcessing(webRequest *webRequest) (*http.Response, error) {
 	if webRequest == nil ||
 		webRequest.session == nil {
-		return nil, fmtErrorf("WebRequest is nil or contains invalid session")
+		return nil, fmt.Errorf("WebRequest is nil or contains invalid session")
 	}
-	var requestObject, requestError = createHTTPRequestFunc(
+	var requestObject, requestError = createHTTPRequest(
 		webRequest,
 	)
 	if requestError != nil {
 		return nil, requestError
 	}
-	var httpClient = getClientForRequestFunc(
+	var httpClient = getClientForRequest(
 		webRequest.sendClientCert,
 	)
-	var startTime = getTimeNowUTCFunc()
-	var responseObject, responseError = clientDoWithRetryFunc(
+	var startTime = time.Now().UTC()
+	var responseObject, responseError = clientDoWithRetry(
 		httpClient,
 		requestObject,
 		webRequest.connRetry,
@@ -360,13 +355,13 @@ func doRequestProcessing(webRequest *webRequest) (*http.Response, error) {
 		webRequest.retryDelay,
 	)
 	if responseError != nil {
-		logErrorResponseFunc(
+		logErrorResponse(
 			webRequest.session,
 			responseError,
 			startTime,
 		)
 	} else {
-		logSuccessResponseFunc(
+		logSuccessResponse(
 			webRequest.session,
 			responseObject,
 			startTime,
@@ -383,8 +378,8 @@ func getDataTemplate(session *session, statusCode int, dataReceivers []dataRecei
 			dataTemplate = dataReceiver.dataTemplate
 		}
 	}
-	if isInterfaceValueNilFunc(dataTemplate) {
-		logWebcallResponseFunc(
+	if isInterfaceValueNil(dataTemplate) {
+		logWebcallResponse(
 			session,
 			"Body",
 			"Receiver",
@@ -396,18 +391,18 @@ func getDataTemplate(session *session, statusCode int, dataReceivers []dataRecei
 }
 
 func parseResponse(session *session, body io.ReadCloser, dataTemplate interface{}) error {
-	var bodyBytes, bodyError = ioutilReadAll(
+	var bodyBytes, bodyError = io.ReadAll(
 		body,
 	)
 	if bodyError != nil {
 		return bodyError
 	}
-	var unmarshalError = tryUnmarshalFunc(
+	var unmarshalError = tryUnmarshal(
 		string(bodyBytes),
 		dataTemplate,
 	)
 	if unmarshalError != nil {
-		logWebcallResponseFunc(
+		logWebcallResponse(
 			session,
 			"Body",
 			"UnmarshalError",
@@ -423,10 +418,10 @@ func parseResponse(session *session, body io.ReadCloser, dataTemplate interface{
 func (webRequest *webRequest) Process() (statusCode int, responseHeader http.Header, responseError error) {
 	if webRequest == nil ||
 		webRequest.session == nil {
-		return 0, nil, fmtErrorf("WebRequest is nil or contains invalid session")
+		return 0, nil, fmt.Errorf("WebRequest is nil or contains invalid session")
 	}
 	var responseObject *http.Response
-	responseObject, responseError = doRequestProcessingFunc(
+	responseObject, responseError = doRequestProcessing(
 		webRequest,
 	)
 	if responseError != nil {
@@ -439,12 +434,12 @@ func (webRequest *webRequest) Process() (statusCode int, responseHeader http.Hea
 		if responseObject == nil {
 			return 0, make(http.Header), nil
 		}
-		var dataTemplate = getDataTemplateFunc(
+		var dataTemplate = getDataTemplate(
 			webRequest.session,
 			responseObject.StatusCode,
 			webRequest.dataReceivers,
 		)
-		responseError = parseResponseFunc(
+		responseError = parseResponse(
 			webRequest.session,
 			responseObject.Body,
 			dataTemplate,

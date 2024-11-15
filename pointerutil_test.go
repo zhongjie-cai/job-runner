@@ -6,17 +6,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/zhongjie-cai/gomocker/v2"
 )
 
 func TestIsInterfaceValueNil_NilInterface(t *testing.T) {
 	// arrange
 	var dummyInterface http.ResponseWriter
 
-	// mock
-	createMock(t)
-
-	// expect
-
 	// SUT + act
 	var result = isInterfaceValueNil(
 		dummyInterface,
@@ -24,25 +20,11 @@ func TestIsInterfaceValueNil_NilInterface(t *testing.T) {
 
 	// assert
 	assert.True(t, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestIsInterfaceValueNil_NilValue(t *testing.T) {
 	// arrange
-	var dummyInterface *dummyCustomization
-
-	// mock
-	createMock(t)
-
-	// expect
-	reflectValueOfExpected = 1
-	reflectValueOf = func(i interface{}) reflect.Value {
-		reflectValueOfCalled++
-		assert.Equal(t, dummyInterface, i)
-		return reflect.ValueOf(i)
-	}
+	var dummyInterface *DefaultCustomization
 
 	// SUT + act
 	var result = isInterfaceValueNil(
@@ -51,9 +33,6 @@ func TestIsInterfaceValueNil_NilValue(t *testing.T) {
 
 	// assert
 	assert.True(t, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestIsInterfaceValueNil_EmptyValue(t *testing.T) {
@@ -61,15 +40,10 @@ func TestIsInterfaceValueNil_EmptyValue(t *testing.T) {
 	var dummyInterface = 0
 
 	// mock
-	createMock(t)
+	var m = gomocker.NewMocker(t)
 
 	// expect
-	reflectValueOfExpected = 1
-	reflectValueOf = func(i interface{}) reflect.Value {
-		reflectValueOfCalled++
-		assert.Equal(t, dummyInterface, i)
-		return reflect.Value{}
-	}
+	m.Mock(reflect.Value.IsValid).Expects(gomocker.Anything()).Returns(false).Once()
 
 	// SUT + act
 	var result = isInterfaceValueNil(
@@ -78,25 +52,11 @@ func TestIsInterfaceValueNil_EmptyValue(t *testing.T) {
 
 	// assert
 	assert.True(t, result)
-
-	// verify
-	verifyAll(t)
 }
 
 func TestIsInterfaceValueNil_ValidValue(t *testing.T) {
 	// arrange
 	var dummyInterface = 0
-
-	// mock
-	createMock(t)
-
-	// expect
-	reflectValueOfExpected = 1
-	reflectValueOf = func(i interface{}) reflect.Value {
-		reflectValueOfCalled++
-		assert.Equal(t, dummyInterface, i)
-		return reflect.ValueOf(dummyInterface)
-	}
 
 	// SUT + act
 	var result = isInterfaceValueNil(
@@ -105,7 +65,4 @@ func TestIsInterfaceValueNil_ValidValue(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
-
-	// verify
-	verifyAll(t)
 }

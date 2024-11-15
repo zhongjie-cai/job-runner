@@ -2,6 +2,7 @@ package jobrunner
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -108,23 +109,21 @@ func (customization *DefaultCustomization) ActionFunc(session Session) error {
 
 // RecoverPanic is to customize the recovery of panic into a valid response and error in case it happens (for recoverable panic only)
 func (customization *DefaultCustomization) RecoverPanic(session Session, recoverResult interface{}) error {
-	if isInterfaceValueNilFunc(recoverResult) {
+	if isInterfaceValueNil(recoverResult) {
 		return nil
 	}
 	var recoverError, ok = recoverResult.(error)
 	if !ok {
-		recoverError = fmtErrorf("%v", recoverResult)
+		recoverError = fmt.Errorf("%v", recoverResult)
 	}
 	return recoverError
 }
 
 // Log is to customize the logging backend for the whole application
 func (customization *DefaultCustomization) Log(session Session, logType LogType, logLevel LogLevel, category, subcategory, description string) {
-	if isInterfaceValueNilFunc(session) {
-		return
-	}
-	fmtPrintf(
-		"<%v|%v> (%v|%v) [%v|%v] %v\n",
+	fmt.Printf(
+		"[%v] <%v|%v> (%v|%v) [%v|%v] %v\n",
+		formatDateTime(time.Now()),
 		session.GetID(),
 		session.GetIndex(),
 		logType,

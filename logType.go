@@ -1,5 +1,10 @@
 package jobrunner
 
+import (
+	"sort"
+	"strings"
+)
+
 // LogType is the entry type of logging
 type LogType int
 
@@ -127,8 +132,8 @@ func (logtype LogType) String() string {
 			result = append(result, value)
 		}
 	}
-	sortStrings(result)
-	return stringsJoin(result, "|")
+	sort.Strings(result)
+	return strings.Join(result, "|")
 }
 
 // HasFlag checks whether this log category has the flag set or not
@@ -144,7 +149,7 @@ func (logtype LogType) HasFlag(flag LogType) bool {
 
 // NewLogType converts a string representation of LogType flag to its strongly typed instance
 func NewLogType(value string) LogType {
-	var splitValues = stringsSplit(
+	var splitValues = strings.Split(
 		value,
 		"|",
 	)

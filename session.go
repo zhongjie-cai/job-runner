@@ -1,6 +1,10 @@
 package jobrunner
 
 import (
+	"encoding/json"
+	"runtime"
+	"strconv"
+
 	"github.com/google/uuid"
 )
 
@@ -139,11 +143,11 @@ func (session *session) GetAttachment(name string, dataTemplate interface{}) boo
 	if !found {
 		return false
 	}
-	var bytes, marshalError = jsonMarshal(attachment)
+	var bytes, marshalError = json.Marshal(attachment)
 	if marshalError != nil {
 		return false
 	}
-	var unmarshalError = jsonUnmarshal(
+	var unmarshalError = json.Unmarshal(
 		bytes,
 		dataTemplate,
 	)
@@ -151,18 +155,18 @@ func (session *session) GetAttachment(name string, dataTemplate interface{}) boo
 }
 
 func getMethodName() string {
-	var pc, _, _, ok = runtimeCaller(3)
+	var pc, _, _, ok = runtime.Caller(3)
 	if !ok {
 		return "?"
 	}
-	var fn = runtimeFuncForPC(pc)
+	var fn = runtime.FuncForPC(pc)
 	return fn.Name()
 }
 
 // LogMethodEnter sends a logging entry of MethodEnter log type for the given session associated to the session ID
 func (session *session) LogMethodEnter() {
-	var methodName = getMethodNameFunc()
-	logMethodEnterFunc(
+	var methodName = getMethodName()
+	logMethodEnter(
 		session,
 		methodName,
 		"",
@@ -172,12 +176,12 @@ func (session *session) LogMethodEnter() {
 
 // LogMethodParameter sends a logging entry of MethodParameter log type for the given session associated to the session ID
 func (session *session) LogMethodParameter(parameters ...interface{}) {
-	var methodName = getMethodNameFunc()
+	var methodName = getMethodName()
 	for index, parameter := range parameters {
-		logMethodParameterFunc(
+		logMethodParameter(
 			session,
 			methodName,
-			strconvItoa(index),
+			strconv.Itoa(index),
 			"%v",
 			parameter,
 		)
@@ -186,7 +190,7 @@ func (session *session) LogMethodParameter(parameters ...interface{}) {
 
 // LogMethodLogic sends a logging entry of MethodLogic log type for the given session associated to the session ID
 func (session *session) LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...interface{}) {
-	logMethodLogicFunc(
+	logMethodLogic(
 		session,
 		logLevel,
 		category,
@@ -198,12 +202,12 @@ func (session *session) LogMethodLogic(logLevel LogLevel, category string, subca
 
 // LogMethodReturn sends a logging entry of MethodReturn log type for the given session associated to the session ID
 func (session *session) LogMethodReturn(returns ...interface{}) {
-	var methodName = getMethodNameFunc()
+	var methodName = getMethodName()
 	for index, returnValue := range returns {
-		logMethodReturnFunc(
+		logMethodReturn(
 			session,
 			methodName,
-			strconvItoa(index),
+			strconv.Itoa(index),
 			"%v",
 			returnValue,
 		)
@@ -212,8 +216,8 @@ func (session *session) LogMethodReturn(returns ...interface{}) {
 
 // LogMethodExit sends a logging entry of MethodExit log type for the given session associated to the session ID
 func (session *session) LogMethodExit() {
-	var methodName = getMethodNameFunc()
-	logMethodExitFunc(
+	var methodName = getMethodName()
+	logMethodExit(
 		session,
 		methodName,
 		"",

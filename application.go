@@ -3,6 +3,9 @@ package jobrunner
 import (
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 // Application is the interface for job runner application
@@ -33,9 +36,10 @@ type application struct {
 }
 
 // NewApplication creates a new application for job runner hosting
-//   instances marks how many action functions to be executed in parallel at once for a single scheduled execution
-//   schedule is a CRON schedule managing when the action functions should be executed until stop signal is given
-//   overlap marks a new execution should be executed or not when a previous execution has not yet completed
+//
+//	instances marks how many action functions to be executed in parallel at once for a single scheduled execution
+//	schedule is a CRON schedule managing when the action functions should be executed until stop signal is given
+//	overlap marks a new execution should be executed or not when a previous execution has not yet completed
 func NewApplication(
 	name string,
 	version string,
@@ -44,7 +48,7 @@ func NewApplication(
 	overlap bool,
 	customization Customization,
 ) Application {
-	if isInterfaceValueNilFunc(customization) {
+	if isInterfaceValueNil(customization) {
 		customization = customizationDefault
 	}
 	var application = &application{
@@ -55,7 +59,7 @@ func NewApplication(
 		schedule:  schedule,
 		overlap:   overlap,
 		session: &session{
-			id:            uuidNew(),
+			id:            uuid.New(),
 			index:         0,
 			attachment:    map[string]interface{}{},
 			customization: customization,
@@ -70,7 +74,7 @@ func NewApplication(
 }
 
 func (app *application) Start() {
-	startApplicationFunc(
+	startApplication(
 		app,
 	)
 }
@@ -94,21 +98,21 @@ func startApplication(app *application) {
 	if app.started {
 		return
 	}
-	if !preBootstrapingFunc(app) {
+	if !preBootstraping(app) {
 		return
 	}
-	bootstrapFunc(app)
-	if !postBootstrapingFunc(app) {
+	bootstrap(app)
+	if !postBootstraping(app) {
 		return
 	}
-	defer endApplicationFunc(app)
-	beginApplicationFunc(app)
+	defer endApplication(app)
+	beginApplication(app)
 }
 
 func preBootstraping(app *application) bool {
 	var preBootstrapError = app.customization.PreBootstrap()
 	if preBootstrapError != nil {
-		logAppRootFunc(
+		logAppRoot(
 			app.session,
 			"application",
 			"preBootstraping",
@@ -121,7 +125,7 @@ func preBootstraping(app *application) bool {
 		)
 		return false
 	}
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"preBootstraping",
@@ -131,13 +135,13 @@ func preBootstraping(app *application) bool {
 }
 
 func bootstrap(app *application) {
-	initializeHTTPClientsFunc(
+	initializeHTTPClients(
 		app.customization.DefaultTimeout(),
 		app.customization.SkipServerCertVerification(),
 		app.customization.ClientCert(),
 		app.customization.RoundTripper,
 	)
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"bootstrap",
@@ -148,7 +152,7 @@ func bootstrap(app *application) {
 func postBootstraping(app *application) bool {
 	var postBootstrapError = app.customization.PostBootstrap()
 	if postBootstrapError != nil {
-		logAppRootFunc(
+		logAppRoot(
 			app.session,
 			"application",
 			"postBootstraping",
@@ -161,7 +165,7 @@ func postBootstraping(app *application) bool {
 		)
 		return false
 	}
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"postBootstraping",
@@ -173,7 +177,7 @@ func postBootstraping(app *application) bool {
 func waitForNextRun(app *application) {
 	var timeNext = app.schedule.NextSchedule()
 	if timeNext == nil {
-		logAppRootFunc(
+		logAppRoot(
 			app.session,
 			"application",
 			"waitForNextRun",
@@ -183,9 +187,9 @@ func waitForNextRun(app *application) {
 		return
 	}
 	var waitDuration = timeNext.Sub(
-		timeNow(),
+		time.Now(),
 	)
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"waitForNextRun",
@@ -193,7 +197,7 @@ func waitForNextRun(app *application) {
 		*timeNext,
 		waitDuration,
 	)
-	<-timeAfter(
+	<-time.After(
 		waitDuration,
 	)
 }
@@ -204,7 +208,7 @@ func runInstances(app *application) {
 		waitGroup.Add(1)
 		atomic.AddInt32(&app.reruns[id], 1)
 		go func(index int, reruns int) {
-			var sessionError = handleSessionFunc(
+			var sessionError = handleSession(
 				app,
 				index,
 				reruns,
@@ -226,7 +230,7 @@ func runInstances(app *application) {
 
 func scheduleExecution(app *application) {
 	for {
-		waitForNextRunFunc(
+		waitForNextRun(
 			app,
 		)
 		if !app.started {
@@ -234,11 +238,11 @@ func scheduleExecution(app *application) {
 		}
 		if app.overlap {
 			app.waits.Add(1)
-			go runInstancesFunc(
+			go runInstances(
 				app,
 			)
 		} else {
-			runInstancesFunc(
+			runInstances(
 				app,
 			)
 		}
@@ -249,12 +253,12 @@ func scheduleExecution(app *application) {
 }
 
 func runApplication(app *application) {
-	if isInterfaceValueNilFunc(app.schedule) {
-		runInstancesFunc(
+	if isInterfaceValueNil(app.schedule) {
+		runInstances(
 			app,
 		)
 	} else {
-		scheduleExecutionFunc(
+		scheduleExecution(
 			app,
 		)
 	}
@@ -262,7 +266,7 @@ func runApplication(app *application) {
 }
 
 func beginApplication(app *application) {
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"beginApplication",
@@ -271,10 +275,10 @@ func beginApplication(app *application) {
 		app.version,
 	)
 	app.started = true
-	go runApplicationFunc(app)
+	go runApplication(app)
 	<-app.shutdown
 	app.started = false
-	logAppRootFunc(
+	logAppRoot(
 		app.session,
 		"application",
 		"beginApplication",
@@ -285,7 +289,7 @@ func beginApplication(app *application) {
 func endApplication(app *application) {
 	var appClosingError = app.customization.AppClosing()
 	if appClosingError != nil {
-		logAppRootFunc(
+		logAppRoot(
 			app.session,
 			"application",
 			"endApplication",
@@ -297,7 +301,7 @@ func endApplication(app *application) {
 			appClosingError,
 		)
 	} else {
-		logAppRootFunc(
+		logAppRoot(
 			app.session,
 			"application",
 			"endApplication",
