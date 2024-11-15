@@ -1,9 +1,9 @@
 # job-runner
 
-[![Build Status](https://travis-ci.com/zhongjie-cai/job-runner.svg?branch=master)](https://travis-ci.com/zhongjie-cai/job-runner)
-[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/zhongjie-cai/job-runner)
+![Test](https://github.com/zhongjie-cai/job-runner/actions/workflows/ci.yaml/badge.svg)
+![Coverage](https://img.shields.io/badge/Coverage-100.0%25-brightgreen)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zhongjie-cai/job-runner)](https://goreportcard.com/report/github.com/zhongjie-cai/job-runner)
-[![Coverage](http://gocover.io/_badge/github.com/zhongjie-cai/job-runner)](http://gocover.io/github.com/zhongjie-cai/job-runner)
+[![Go Reference](https://pkg.go.dev/badge/github.com/zhongjie-cai/job-runner.svg)](https://pkg.go.dev/github.com/zhongjie-cai/job-runner)
 
 This library is provided as a wrapper utility for quickly create and run your jobs in an application.
 
