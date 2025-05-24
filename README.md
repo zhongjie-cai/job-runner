@@ -131,6 +131,9 @@ if !success {
 } else {
 	// succeeded to retrieve an attachment: add your customized logic here if needed
 }
+
+// alternatively, use the sugar-function to retrieve attachment like below
+var retrievedAttachment, success = jobrunner.GetAttachmentFromSession[anyJSONSerializableStruct](session, myAttachmentName)
 ```
 
 In some situations, it is good to detach a certain attachment, especially if it is a big object consuming large memory, which can be done as following.
