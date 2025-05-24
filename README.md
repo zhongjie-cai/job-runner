@@ -106,11 +106,11 @@ The `Logic` is the normal logging that can be used in any place at any level in 
 
 # Session Attachment
 
-The registered session contains an attachment dictionary, which allows the user to attach any object which is JSON serializable into the given session associated to a session ID.
+The registered session contains an attachment dictionary, which allows the user to attach any object into the given session associated to a session ID.
 
 ```golang
 var myAttachmentName = "my attachment name"
-var myAttachmentObject = anyJSONSerializableStruct {
+var myAttachmentObject = anyStruct {
 	...
 }
 var success = session.Attach(myAttachmentName, myAttachmentObject)
@@ -125,7 +125,7 @@ To retrieve a previously attached object from session, simply use the following 
 
 ```golang
 var myAttachmentName = "my attachment name"
-var retrievedAttachment anyJSONSerializableStruct
+var retrievedAttachment anyStruct
 var success = session.GetAttachment(myAttachmentName, &retrievedAttachment)
 if !success {
 	// failed to retrieve an attachment: add your customized logic here if needed
@@ -134,7 +134,7 @@ if !success {
 }
 
 // alternatively, use the sugar-function to retrieve attachment like below
-var retrievedAttachment, success = jobrunner.GetAttachmentFromSession[anyJSONSerializableStruct](session, myAttachmentName)
+var retrievedAttachment, success = jobrunner.GetAttachmentFromSession[anyStruct](session, myAttachmentName)
 ```
 
 In some situations, it is good to detach a certain attachment, especially if it is a big object consuming large memory, which can be done as following.
