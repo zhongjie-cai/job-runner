@@ -15,13 +15,13 @@ import (
 	"github.com/zhongjie-cai/gomocker/v2"
 )
 
-func functionPointerEquals(expectFunc interface{}, actualFunc interface{}) bool {
+func functionPointerEquals(expectFunc any, actualFunc any) bool {
 	var expectValue = fmt.Sprintf("%v", reflect.ValueOf(expectFunc))
 	var actualValue = fmt.Sprintf("%v", reflect.ValueOf(actualFunc))
 	return expectValue == actualValue
 }
 
-func assertFunctionEquals(t *testing.T, expectFunc interface{}, actualFunc interface{}) {
+func assertFunctionEquals(t *testing.T, expectFunc any, actualFunc any) {
 	assert.True(t, functionPointerEquals(expectFunc, actualFunc))
 }
 
@@ -552,7 +552,7 @@ func TestRunInstances_MultipleInstances(t *testing.T) {
 	var lock = sync.RWMutex{}
 
 	// stub
-	var callChecker = func(value interface{}) bool {
+	var callChecker = func(value any) bool {
 		lock.Lock()
 		defer lock.Unlock()
 		var called, found = calls[value.(int)]
@@ -623,14 +623,10 @@ func TestScheduleExecution_WithOverlap(t *testing.T) {
 
 	// expect
 	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().Once()
-	m.Mock(runInstances).Expects(dummyApplication).Returns().SideEffect(
-		func(index int, params ...interface{}) {
-			dummyApplication.waits.Done()
-		}).Once()
-	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffect(
-		func(index int, params ...interface{}) {
-			dummyApplication.started = false
-		}).Once()
+	m.Mock(runInstances).Expects(dummyApplication).Returns().SideEffects(
+		gomocker.GeneralSideEffect(0, func() { dummyApplication.waits.Done() })).Once()
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffects(
+		gomocker.GeneralSideEffect(0, func() { dummyApplication.started = false })).Once()
 
 	// SUT + act
 	scheduleExecution(
@@ -652,9 +648,8 @@ func TestScheduleExecution_NoOverlap(t *testing.T) {
 	// expect
 	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().Once()
 	m.Mock(runInstances).Expects(dummyApplication).Returns().Once()
-	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffect(func(index int, params ...interface{}) {
-		dummyApplication.started = false
-	}).Once()
+	m.Mock(waitForNextRun).Expects(dummyApplication).Returns().SideEffects(
+		gomocker.GeneralSideEffect(0, func() { dummyApplication.started = false })).Once()
 
 	// SUT + act
 	scheduleExecution(
@@ -737,9 +732,8 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 	var m = gomocker.NewMocker(t)
 
 	// expect
-	m.Mock(runApplication).Expects(dummyApplication).Returns().SideEffect(func(index int, params ...interface{}) {
-		dummyShutdown <- true
-	}).Once()
+	m.Mock(runApplication).Expects(dummyApplication).Returns().SideEffects(
+		gomocker.GeneralSideEffect(1, func() { dummyShutdown <- true })).Once()
 	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication",
 		"Trying to start runner [%v] (v-%v)", dummyName, dummyVersion).Returns().Once()
 	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication", "Runner terminated").Returns().Once()

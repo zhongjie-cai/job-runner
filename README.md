@@ -94,9 +94,9 @@ Log level only affects all `Method`-prefixed log types; for all other log types,
 The registered session allows the user to add manual logging to its codebase, through several listed methods as
 ```golang
 session.LogMethodEnter()
-session.LogMethodParameter(parameters ...interface{})
-session.LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...interface{})
-session.LogMethodReturn(returns ...interface{})
+session.LogMethodParameter(parameters ...any)
+session.LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...any)
+session.LogMethodReturn(returns ...any)
 session.LogMethodExit()
 ```
 

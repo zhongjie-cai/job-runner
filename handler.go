@@ -16,7 +16,7 @@ func initiateSession(
 		id:            uuid.New(),
 		index:         index,
 		reruns:        reruns,
-		attachment:    map[string]interface{}{},
+		attachment:    map[string]any{},
 		customization: app.customization,
 	}
 }
@@ -24,7 +24,7 @@ func initiateSession(
 func finalizeSession(
 	session *session,
 	errorResult error,
-	recoverResult interface{},
+	recoverResult any,
 ) error {
 	var recoverError = session.customization.RecoverPanic(
 		session,

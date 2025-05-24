@@ -1,7 +1,7 @@
 package jobrunner
 
 import (
-	"encoding/json"
+	"reflect"
 	"runtime"
 	"strconv"
 
@@ -31,16 +31,16 @@ type SessionMeta interface {
 // SessionAttachment is a subset of Session interface, containing only attachment related methods
 type SessionAttachment interface {
 	// Attach attaches any value object into the given session associated to the session ID
-	Attach(name string, value interface{}) bool
+	Attach(name string, value any) bool
 
 	// Detach detaches any value object from the given session associated to the session ID
 	Detach(name string) bool
 
 	// GetRawAttachment retrieves any value object from the given session associated to the session ID and returns the raw interface (consumer needs to manually cast, but works for struct with private fields)
-	GetRawAttachment(name string) (interface{}, bool)
+	GetRawAttachment(name string) (any, bool)
 
 	// GetAttachment retrieves any value object from the given session associated to the session ID and unmarshals the content to given data template (only works for structs with exported fields)
-	GetAttachment(name string, dataTemplate interface{}) bool
+	GetAttachment(name string, dataTemplate any) bool
 }
 
 // SessionLogging is a subset of Session interface, containing only logging related methods
@@ -49,13 +49,13 @@ type SessionLogging interface {
 	LogMethodEnter()
 
 	// LogMethodParameter sends a logging entry of MethodParameter log type for the given session associated to the session ID
-	LogMethodParameter(parameters ...interface{})
+	LogMethodParameter(parameters ...any)
 
 	// LogMethodLogic sends a logging entry of MethodLogic log type for the given session associated to the session ID
-	LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...interface{})
+	LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...any)
 
 	// LogMethodReturn sends a logging entry of MethodReturn log type for the given session associated to the session ID
-	LogMethodReturn(returns ...interface{})
+	LogMethodReturn(returns ...any)
 
 	// LogMethodExit sends a logging entry of MethodExit log type for the given session associated to the session ID
 	LogMethodExit()
@@ -71,7 +71,7 @@ type session struct {
 	id            uuid.UUID
 	index         int
 	reruns        int
-	attachment    map[string]interface{}
+	attachment    map[string]any
 	customization Customization
 }
 
@@ -100,12 +100,12 @@ func (session *session) GetReruns() int {
 }
 
 // Attach attaches any value object into the given session associated to the session ID
-func (session *session) Attach(name string, value interface{}) bool {
+func (session *session) Attach(name string, value any) bool {
 	if session == nil {
 		return false
 	}
 	if session.attachment == nil {
-		session.attachment = map[string]interface{}{}
+		session.attachment = map[string]any{}
 	}
 	session.attachment[name] = value
 	return true
@@ -123,7 +123,7 @@ func (session *session) Detach(name string) bool {
 }
 
 // GetRawAttachment retrieves any value object from the given session associated to the session ID and returns the raw interface (consumer needs to manually cast, but works for struct with private fields)
-func (session *session) GetRawAttachment(name string) (interface{}, bool) {
+func (session *session) GetRawAttachment(name string) (any, bool) {
 	if session == nil {
 		return nil, false
 	}
@@ -134,8 +134,21 @@ func (session *session) GetRawAttachment(name string) (interface{}, bool) {
 	return attachment, true
 }
 
+// GetAttachmentFromSession is a sugar-function to retrieve attachment as an object via generics
+func GetAttachmentFromSession[T any](session Session, name string) (*T, bool) {
+	var attachment, found = session.GetRawAttachment(name)
+	if !found {
+		return new(T), false
+	}
+	var result, ok = attachment.(T)
+	if !ok {
+		return new(T), false
+	}
+	return &result, true
+}
+
 // GetAttachment retrieves any value object from the given session associated to the session ID and unmarshals the content to given data template
-func (session *session) GetAttachment(name string, dataTemplate interface{}) bool {
+func (session *session) GetAttachment(name string, dataTemplate any) bool {
 	if session == nil {
 		return false
 	}
@@ -143,15 +156,14 @@ func (session *session) GetAttachment(name string, dataTemplate interface{}) boo
 	if !found {
 		return false
 	}
-	var bytes, marshalError = json.Marshal(attachment)
-	if marshalError != nil {
+	var vTemplate = reflect.ValueOf(dataTemplate)
+	var tTemplate = vTemplate.Type()
+	if tTemplate.Kind() != reflect.Pointer {
 		return false
 	}
-	var unmarshalError = json.Unmarshal(
-		bytes,
-		dataTemplate,
-	)
-	return unmarshalError == nil
+	vTemplate = reflect.Indirect(vTemplate)
+	vTemplate.Set(reflect.ValueOf(attachment))
+	return true
 }
 
 func getMethodName() string {
@@ -175,7 +187,7 @@ func (session *session) LogMethodEnter() {
 }
 
 // LogMethodParameter sends a logging entry of MethodParameter log type for the given session associated to the session ID
-func (session *session) LogMethodParameter(parameters ...interface{}) {
+func (session *session) LogMethodParameter(parameters ...any) {
 	var methodName = getMethodName()
 	for index, parameter := range parameters {
 		logMethodParameter(
@@ -189,7 +201,7 @@ func (session *session) LogMethodParameter(parameters ...interface{}) {
 }
 
 // LogMethodLogic sends a logging entry of MethodLogic log type for the given session associated to the session ID
-func (session *session) LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...interface{}) {
+func (session *session) LogMethodLogic(logLevel LogLevel, category string, subcategory string, messageFormat string, parameters ...any) {
 	logMethodLogic(
 		session,
 		logLevel,
@@ -201,7 +213,7 @@ func (session *session) LogMethodLogic(logLevel LogLevel, category string, subca
 }
 
 // LogMethodReturn sends a logging entry of MethodReturn log type for the given session associated to the session ID
-func (session *session) LogMethodReturn(returns ...interface{}) {
+func (session *session) LogMethodReturn(returns ...any) {
 	var methodName = getMethodName()
 	for index, returnValue := range returns {
 		logMethodReturn(

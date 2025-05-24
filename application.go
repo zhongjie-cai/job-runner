@@ -61,7 +61,7 @@ func NewApplication(
 		session: &session{
 			id:            uuid.New(),
 			index:         0,
-			attachment:    map[string]interface{}{},
+			attachment:    map[string]any{},
 			customization: customization,
 		},
 		customization: customization,

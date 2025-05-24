@@ -2,7 +2,7 @@ package jobrunner
 
 import "reflect"
 
-func isInterfaceValueNil(i interface{}) bool {
+func isInterfaceValueNil(i any) bool {
 	if i == nil {
 		return true
 	}

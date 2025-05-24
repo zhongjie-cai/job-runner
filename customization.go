@@ -43,7 +43,7 @@ type HandlerCustomization interface {
 	ActionFunc(session Session) error
 
 	// RecoverPanic is to customize the recovery of panic into a valid response and error in case it happens (for recoverable panic only)
-	RecoverPanic(session Session, recoverResult interface{}) error
+	RecoverPanic(session Session, recoverResult any) error
 }
 
 // LoggingCustomization holds customization methods related to logging
@@ -108,7 +108,7 @@ func (customization *DefaultCustomization) ActionFunc(session Session) error {
 }
 
 // RecoverPanic is to customize the recovery of panic into a valid response and error in case it happens (for recoverable panic only)
-func (customization *DefaultCustomization) RecoverPanic(session Session, recoverResult interface{}) error {
+func (customization *DefaultCustomization) RecoverPanic(session Session, recoverResult any) error {
 	if isInterfaceValueNil(recoverResult) {
 		return nil
 	}

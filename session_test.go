@@ -1,7 +1,6 @@
 package jobrunner
 
 import (
-	"encoding/json"
 	"errors"
 	"math/rand/v2"
 	"runtime"
@@ -166,7 +165,7 @@ func TestSessionAttach_WithAttachment(t *testing.T) {
 
 	// SUT
 	var dummySession = &session{
-		attachment: map[string]interface{}{
+		attachment: map[string]any{
 			dummyName: "some value",
 		},
 	}
@@ -224,7 +223,7 @@ func TestSessionDetach_WithAttachment(t *testing.T) {
 
 	// SUT
 	var dummySession = &session{
-		attachment: map[string]interface{}{
+		attachment: map[string]any{
 			dummyName: "some value",
 		},
 	}
@@ -290,7 +289,7 @@ func TestSessionGetRawAttachment_Success(t *testing.T) {
 
 	// SUT
 	var dummySession = &session{
-		attachment: map[string]interface{}{
+		attachment: map[string]any{
 			dummyName: dummyValue,
 		},
 	}
@@ -305,10 +304,82 @@ func TestSessionGetRawAttachment_Success(t *testing.T) {
 	assert.True(t, found)
 }
 
+func TestGetAttachmentFromSession_NotFound(t *testing.T) {
+	// arrange
+	var dummyName = "some name"
+	var dummyResult = rand.Int()
+
+	// mock
+	var m = gomocker.NewMocker(t)
+
+	// SUT
+	var sut = &session{}
+
+	// expect
+	m.Mock((*session).GetRawAttachment).Expects(sut, dummyName).Returns(dummyResult, false).Once()
+
+	//  act
+	var result, found = GetAttachmentFromSession[int](sut, dummyName)
+
+	// assert
+	assert.Zero(t, *result)
+	assert.False(t, found)
+}
+
+func TestGetAttachmentFromSession_TypeMismatch(t *testing.T) {
+	// arrange
+	var dummyName = "some name"
+	var dummyResult = "some value"
+
+	// mock
+	var m = gomocker.NewMocker(t)
+
+	// SUT
+	var sut = &session{}
+
+	// expect
+	m.Mock((*session).GetRawAttachment).Expects(sut, dummyName).Returns(dummyResult, true).Once()
+
+	//  act
+	var result, found = GetAttachmentFromSession[int](sut, dummyName)
+
+	// assert
+	assert.Zero(t, *result)
+	assert.False(t, found)
+}
+
+func TestGetAttachmentFromSession_Success(t *testing.T) {
+	// arrange
+	var dummyName = "some name"
+	var dummyResult = rand.Int()
+
+	// mock
+	var m = gomocker.NewMocker(t)
+
+	// SUT
+	var sut = &session{}
+
+	// expect
+	m.Mock((*session).GetRawAttachment).Expects(sut, dummyName).Returns(dummyResult, true).Once()
+
+	//  act
+	var result, found = GetAttachmentFromSession[int](sut, dummyName)
+
+	// assert
+	assert.Equal(t, dummyResult, *result)
+	assert.True(t, found)
+}
+
+type dummyAttachment struct {
+	ID   uuid.UUID
+	Foo  string
+	Test int
+}
+
 func TestSessionGetAttachment_NoSession(t *testing.T) {
 	// arrange
 	var dummyName = "some name"
-	var dummyDataTemplate map[string]interface{}
+	var dummyDataTemplate dummyAttachment
 
 	// SUT
 	var dummySession *session
@@ -321,16 +392,11 @@ func TestSessionGetAttachment_NoSession(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
-	assert.Zero(t, result)
+	assert.Zero(t, dummyDataTemplate)
 }
 
 func TestSessionGetAttachment_NoAttachment(t *testing.T) {
 	// arrange
-	type dummyAttachment struct {
-		ID   uuid.UUID
-		Foo  string
-		Test int
-	}
 	var dummyName = "some name"
 	var dummyDataTemplate dummyAttachment
 
@@ -345,33 +411,22 @@ func TestSessionGetAttachment_NoAttachment(t *testing.T) {
 
 	// assert
 	assert.False(t, result)
-	assert.Zero(t, result)
+	assert.Zero(t, dummyDataTemplate)
 }
 
-func TestSessionGetAttachment_MarshalError(t *testing.T) {
+func TestSessionGetAttachment_DataTemplateNotAPointer(t *testing.T) {
 	// arrange
-	type dummyAttachment struct {
-		ID   uuid.UUID
-		Foo  string
-		Test int
-	}
 	var dummyName = "some name"
 	var dummyValue = dummyAttachment{
 		Foo:  "bar",
-		Test: rand.IntN(100),
+		Test: rand.Int(),
 		ID:   uuid.New(),
 	}
 	var dummyDataTemplate dummyAttachment
 
-	// mock
-	var m = gomocker.NewMocker(t)
-
-	// expect
-	m.Mock(json.Marshal).Expects(dummyValue).Returns(nil, errors.New("some marshal error")).Once()
-
 	// SUT
 	var dummySession = &session{
-		attachment: map[string]interface{}{
+		attachment: map[string]any{
 			dummyName: dummyValue,
 		},
 	}
@@ -379,65 +434,27 @@ func TestSessionGetAttachment_MarshalError(t *testing.T) {
 	// act
 	var result = dummySession.GetAttachment(
 		dummyName,
-		&dummyDataTemplate,
+		dummyDataTemplate,
 	)
 
 	// assert
 	assert.False(t, result)
-	assert.Zero(t, result)
-}
-
-func TestSessionGetAttachment_UnmarshalError(t *testing.T) {
-	// arrange
-	type dummyAttachment struct {
-		ID   uuid.UUID
-		Foo  string
-		Test int
-	}
-	var dummyName = "some name"
-	var dummyValue = dummyAttachment{
-		Foo:  "bar",
-		Test: rand.IntN(100),
-		ID:   uuid.New(),
-	}
-	var dummyDataTemplate int
-
-	// SUT
-	var dummySession = &session{
-		attachment: map[string]interface{}{
-			dummyName: dummyValue,
-		},
-	}
-
-	// act
-	var result = dummySession.GetAttachment(
-		dummyName,
-		&dummyDataTemplate,
-	)
-
-	// assert
-	assert.False(t, result)
-	assert.Zero(t, result)
+	assert.NotEqual(t, dummyValue, dummyDataTemplate)
 }
 
 func TestSessionGetAttachment_Success(t *testing.T) {
 	// arrange
-	type dummyAttachment struct {
-		ID   uuid.UUID
-		Foo  string
-		Test int
-	}
 	var dummyName = "some name"
 	var dummyValue = dummyAttachment{
 		Foo:  "bar",
-		Test: rand.IntN(100),
+		Test: rand.Int(),
 		ID:   uuid.New(),
 	}
 	var dummyDataTemplate dummyAttachment
 
 	// SUT
 	var dummySession = &session{
-		attachment: map[string]interface{}{
+		attachment: map[string]any{
 			dummyName: dummyValue,
 		},
 	}
@@ -508,7 +525,7 @@ func TestSessionLogMethodParameter(t *testing.T) {
 	var dummyParameter1 = "foo"
 	var dummyParameter2 = rand.Int()
 	var dummyParameter3 = errors.New("test")
-	var dummyParameters = []interface{}{
+	var dummyParameters = []any{
 		dummyParameter1,
 		dummyParameter2,
 		dummyParameter3,
@@ -586,7 +603,7 @@ func TestSessionLogMethodReturn(t *testing.T) {
 	var dummyReturn1 = "foo"
 	var dummyReturn2 = rand.Int()
 	var dummyReturn3 = errors.New("test")
-	var dummyReturns = []interface{}{
+	var dummyReturns = []any{
 		dummyReturn1,
 		dummyReturn2,
 		dummyReturn3,

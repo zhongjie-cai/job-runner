@@ -266,7 +266,7 @@ func TestTryUnmarshalPrimitiveTypes_OtherTypes(t *testing.T) {
 func TestTryUnmarshal_NilDataTemplate(t *testing.T) {
 	// arrange
 	var dummyValue = "some value"
-	var dummyDataTemplate interface{}
+	var dummyDataTemplate any
 
 	// mock
 	var m = gomocker.NewMocker(t)
@@ -296,11 +296,8 @@ func TestTryUnmarshal_PrimitiveType(t *testing.T) {
 
 	// expect
 	m.Mock(isInterfaceValueNil).Expects(&dummyDataTemplate).Returns(false).Once()
-	m.Mock(tryUnmarshalPrimitiveTypes).Expects(dummyValue, gomocker.Anything()).
-		Returns(true).SideEffect(
-		func(index int, params ...interface{}) {
-			(*(params[1]).(*string)) = dummyData
-		}).Once()
+	m.Mock(tryUnmarshalPrimitiveTypes).Expects(dummyValue, gomocker.Anything()).Returns(true).SideEffects(
+		gomocker.ParamSideEffect(1, 2, func(value *string) { *value = dummyData })).Once()
 
 	// SUT + act
 	var err = tryUnmarshal(
