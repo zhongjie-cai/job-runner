@@ -151,8 +151,8 @@ if !success {
 
 # External Webcall Requests
 
-The library provides a way to send out HTTP/HTTPS requests to external web services based on current session. 
-Using this provided feature ensures the logging of the web service requests into corresponding log type for the given session. 
+The library provides a way to send out HTTP/HTTPS requests to external web services based on current session.
+Using this provided feature ensures the logging of the web service requests into corresponding log type for the given session.
 
 You can reuse a same struct for multiple HTTP status codes, as long as the structures in JSON format are compatible.
 If there is no receiver entry registered for a particular HTTP status code, the corresponding response body is ignored for deserialization when that HTTP status code is received.
@@ -176,24 +176,25 @@ webcallRequest.AddHeader(
 	"Accept",
 	"application/json",
 ).Anticipate(
-	http.StatusOK,
-	http.StatusBadRequest,
 	&responseOn200,
+	webserver.StatusCodeRange{
+		Begin: http.StatusOK,
+		End:   http.StatusBadRequest,
+	}
 ).Anticipate(
-	http.StatusBadRequest,
-	http.StatusInternalServerError,
 	&responseOn400,
+	http.StatusBadRequest,
+	http.StatusForbidden,
 ).Anticipate(
-	http.StatusInternalServerError,
-	999,
 	&responseOn500,
+	webserver.StatusCodeRange{
+		Begin: http.StatusInternalServerError,
+	},
 )
 var statusCode, responseHeader, responseError = webcallRequest.Process()
 
 ...
 ```
-
-You can reuse a same struct for multiple HTTP status codes, as long as the structures in JSON format are compatible. If there is no receiver entry defined in data template map for a particular HTTP status code, the corresponding response body is ignored for deserialization when that HTTP status code is received.
 
 Webcall requests would send out client certificate for mTLS communications if the following customization is in place.
 
@@ -207,7 +208,7 @@ Webcall requests could also be customized for：
 
 ## HTTP Client's HTTP Transport (http.RoundTripper)
 
-This is to enable the 3rd party monitoring libraries, e.g. new relic, to wrap the HTTP transport for better handling of webcall communications. 
+This is to enable the 3rd party monitoring libraries, e.g. new relic, to wrap the HTTP transport for better handling of webcall communications.
 
 ```golang
 func (customization *myCustomization) RoundTripper(originalTransport http.RoundTripper) http.RoundTripper {

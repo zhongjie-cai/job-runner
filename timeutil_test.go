@@ -5,7 +5,26 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/zhongjie-cai/gomocker/v2"
 )
+
+func TestGetTimeNowUTC(t *testing.T) {
+	// arrange
+	var dummyResult = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	var expectedResult = dummyResult.UTC()
+
+	// mock
+	var m = gomocker.NewMocker(t)
+
+	// expect
+	m.Mock(time.Now).Expects().Returns(expectedResult).Once()
+
+	// SUT + act
+	var result = getTimeNowUTC()
+
+	// assert
+	assert.Equal(t, expectedResult, result)
+}
 
 func TestFormatDate(t *testing.T) {
 	// arrange

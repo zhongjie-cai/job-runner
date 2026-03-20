@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"net/http"
 	"reflect"
 	"sync"
 	"testing"
@@ -342,6 +343,7 @@ func TestBootstrap_HappyPath(t *testing.T) {
 		session:       dummySession,
 		customization: dummyCustomization,
 	}
+	var dummyHttpClient = &http.Client{Timeout: time.Duration(rand.IntN(100))}
 	var dummyWebcallTimeout = time.Duration(rand.IntN(100))
 	var dummySkipCertVerification = rand.IntN(100) > 50
 	var dummyClientCertificate = &tls.Certificate{Certificate: [][]byte{{0}}}
@@ -351,11 +353,11 @@ func TestBootstrap_HappyPath(t *testing.T) {
 	var m = gomocker.NewMocker(t)
 
 	// expect
-	m.Mock(initializeHTTPClients).Expects(dummyWebcallTimeout, dummySkipCertVerification,
-		dummyClientCertificate, gomocker.Anything()).Returns().Once()
+	m.Mock((*customization).HttpClient).Expects(dummyCustomization).Returns(dummyHttpClient).Once()
 	m.Mock((*customization).DefaultTimeout).Expects(dummyCustomization).Returns(dummyWebcallTimeout).Once()
 	m.Mock((*customization).SkipServerCertVerification).Expects(dummyCustomization).Returns(dummySkipCertVerification).Once()
 	m.Mock((*customization).ClientCert).Expects(dummyCustomization).Returns(dummyClientCertificate).Once()
+	m.Mock(initializeHTTPClients).Expects(dummyHttpClient, dummyWebcallTimeout, dummySkipCertVerification, dummyClientCertificate, gomocker.Anything()).Returns().Once()
 	m.Mock(logAppRoot).Expects(dummySession, "application", "bootstrap", dummyMessageFormat).Returns().Once()
 
 	// SUT + act

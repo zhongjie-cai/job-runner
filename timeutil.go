@@ -8,6 +8,11 @@ const (
 	dateTimeFormat string = dateFormat + "T" + timeFormat
 )
 
+// getTimeNowUTC returns the current time in UTC format
+func getTimeNowUTC() time.Time {
+	return time.Now().UTC()
+}
+
 // formatDate returns the time in string format "yyyy-MM-dd"
 func formatDate(value time.Time) string {
 	return value.Format(dateFormat)

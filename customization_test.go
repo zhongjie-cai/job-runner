@@ -180,6 +180,14 @@ func TestDefaultCustomization_RecoverPanic_RecoverResultAsNonError(t *testing.T)
 	assert.Equal(t, dummyError, err)
 }
 
+func TestDefaultCustomization_HttpClient(t *testing.T) {
+	// SUT + act
+	var result = customizationDefault.HttpClient()
+
+	// assert
+	assert.Nil(t, result)
+}
+
 func TestDefaultCustomization_ClientCert(t *testing.T) {
 	// SUT + act
 	var result = customizationDefault.ClientCert()

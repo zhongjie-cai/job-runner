@@ -54,6 +54,9 @@ type LoggingCustomization interface {
 
 // WebRequestCustomization holds customization methods related to web requests
 type WebRequestCustomization interface {
+	// HttpClient is to customize the HTTP client to be used for making web requests; if set, the ClientCert, DefaultTimeout, and SkipServerCertVerification will have no effect
+	HttpClient() *http.Client
+
 	// ClientCert is to customize the client certificate for external requests; if not set or nil, no client certificate is sent to external web services
 	ClientCert() *tls.Certificate
 
@@ -132,6 +135,11 @@ func (customization *DefaultCustomization) Log(session Session, logType LogType,
 		subcategory,
 		description,
 	)
+}
+
+// HttpClient is to customize the HTTP client to be used for making web requests; if set, the ClientCert, DefaultTimeout, and SkipServerCertVerification will have no effect
+func (customization *DefaultCustomization) HttpClient() *http.Client {
+	return nil
 }
 
 // ClientCert is to customize the client certificate for external requests; if not set or nil, no client certificate is sent to external web services

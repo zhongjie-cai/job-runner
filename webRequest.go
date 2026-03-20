@@ -13,11 +13,15 @@ import (
 )
 
 var (
+	httpClientCustom   *http.Client
 	httpClientWithCert *http.Client
 	httpClientNoCert   *http.Client
 )
 
 func getClientForRequest(sendClientCert bool) *http.Client {
+	if httpClientCustom != nil {
+		return httpClientCustom
+	}
 	if sendClientCert {
 		return httpClientWithCert
 	}
@@ -63,18 +67,17 @@ func getHTTPTransport(
 	clientCertificate *tls.Certificate,
 	roundTripperWrapper func(originalTransport http.RoundTripper) http.RoundTripper,
 ) http.RoundTripper {
-	var httpTransport = http.DefaultTransport
+	var tlsConfig = &tls.Config{
+		InsecureSkipVerify: skipServerCertVerification,
+	}
 	if clientCertificate != nil {
-		var tlsConfig = &tls.Config{
-			Certificates: []tls.Certificate{
-				*clientCertificate,
-			},
-			InsecureSkipVerify: skipServerCertVerification,
+		tlsConfig.Certificates = []tls.Certificate{
+			*clientCertificate,
 		}
-		httpTransport = &http.Transport{
-			TLSClientConfig: tlsConfig,
-			Proxy:           http.ProxyFromEnvironment,
-		}
+	}
+	var httpTransport = &http.Transport{
+		TLSClientConfig: tlsConfig,
+		Proxy:           http.ProxyFromEnvironment,
 	}
 	return roundTripperWrapper(
 		httpTransport,
@@ -82,11 +85,13 @@ func getHTTPTransport(
 }
 
 func initializeHTTPClients(
+	httpClient *http.Client,
 	webcallTimeout time.Duration,
 	skipServerCertVerification bool,
 	clientCertificate *tls.Certificate,
 	roundTripperWrapper func(originalTransport http.RoundTripper) http.RoundTripper,
 ) {
+	httpClientCustom = httpClient
 	httpClientWithCert = &http.Client{
 		Transport: getHTTPTransport(skipServerCertVerification, clientCertificate, roundTripperWrapper),
 		Timeout:   webcallTimeout,
@@ -97,24 +102,35 @@ func initializeHTTPClients(
 	}
 }
 
+// StatusCodeRange is a struct containing the beginning and ending of status codes to be checked
+type StatusCodeRange struct {
+	// Begin is the inclusive beginning of HTTP status codes to be checked
+	Begin int
+	// End is the exclusive ending of HTTP status codes to be checked
+	End int
+}
+
 // WebRequest is an interface for easy operating on webcall requests and responses
 type WebRequest interface {
 	// AddQuery adds a query to the request URL for sending through HTTP
 	AddQuery(name string, value string) WebRequest
+	// AddQueries adds a set of queries to the request URL for sending through HTTP
+	AddQueries(queries map[string]string) WebRequest
 	// AddHeader adds a header to the request Header for sending through HTTP
 	AddHeader(name string, value string) WebRequest
+	// AddHeaders adds a set of headers to the request Header for sending through HTTP
+	AddHeaders(headers map[string]string) WebRequest
 	// SetupRetry sets up automatic retry upon error of specific HTTP status codes; each entry maps an HTTP status code to how many times retry should happen if code matches
 	SetupRetry(connectivityRetryCount int, httpStatusRetryCount map[int]int, retryDelay time.Duration) WebRequest
-	// Anticipate registers a data template to be deserialized to when the given range of HTTP status codes are returned during the processing of the web request; latter registration overrides former when overlapping
-	Anticipate(beginStatusCode int, endStatusCode int, dataTemplate any) WebRequest
+	// Anticipate registers a data template to be deserialized to when the given range of HTTP status codes are returned during the processing of the web request; latter registration overrides former when overlapping; statusCodes can be either integers, or StatusCodeRange instances
+	Anticipate(dataTemplate any, statusCodes ...any) WebRequest
 	// Process sends the webcall request over the wire, retrieves and serialize the response to registered data templates, and returns status code, header and error accordingly
 	Process() (statusCode int, responseHeader http.Header, responseError error)
 }
 
 type dataReceiver struct {
-	beginStatusCode int
-	endStatusCode   int
-	dataTemplate    any
+	dataTemplate any
+	codeRange    StatusCodeRange
 }
 
 type webRequest struct {
@@ -145,6 +161,22 @@ func (webRequest *webRequest) AddQuery(name string, value string) WebRequest {
 	return webRequest
 }
 
+// AddQueries adds a set of queries to the request URL for sending through HTTP
+func (webRequest *webRequest) AddQueries(queries map[string]string) WebRequest {
+	if webRequest.query == nil {
+		webRequest.query = make(map[string][]string)
+	}
+	for name, value := range queries {
+		var queryValues = webRequest.query[name]
+		queryValues = append(
+			queryValues,
+			value,
+		)
+		webRequest.query[name] = queryValues
+	}
+	return webRequest
+}
+
 // AddHeader adds a header to the request Header for sending through HTTP
 func (webRequest *webRequest) AddHeader(name string, value string) WebRequest {
 	if webRequest.header == nil {
@@ -159,6 +191,22 @@ func (webRequest *webRequest) AddHeader(name string, value string) WebRequest {
 	return webRequest
 }
 
+// AddHeaders adds a set of headers to the request Header for sending through HTTP
+func (webRequest *webRequest) AddHeaders(headers map[string]string) WebRequest {
+	if webRequest.header == nil {
+		webRequest.header = make(map[string][]string)
+	}
+	for name, value := range headers {
+		var headerValues = webRequest.header[name]
+		headerValues = append(
+			headerValues,
+			value,
+		)
+		webRequest.header[name] = headerValues
+	}
+	return webRequest
+}
+
 // SetupRetry sets up automatic retry upon error of specific HTTP status codes; each entry maps an HTTP status code to how many times retry should happen if code matches; 0 stands for error not mapped to an HTTP status code, e.g. webcall or connectivity issue
 func (webRequest *webRequest) SetupRetry(connectivityRetryCount int, httpStatusRetryCount map[int]int, retryDelay time.Duration) WebRequest {
 	webRequest.connRetry = connectivityRetryCount
@@ -168,15 +216,50 @@ func (webRequest *webRequest) SetupRetry(connectivityRetryCount int, httpStatusR
 }
 
 // Anticipate registers a data template to be deserialized to when the given range of HTTP status codes are returned during the processing of the web request; latter registration overrides former when overlapping
-func (webRequest *webRequest) Anticipate(beginStatusCode int, endStatusCode int, dataTemplate any) WebRequest {
-	webRequest.dataReceivers = append(
-		webRequest.dataReceivers,
-		dataReceiver{
-			beginStatusCode: beginStatusCode,
-			endStatusCode:   endStatusCode,
-			dataTemplate:    dataTemplate,
-		},
-	)
+func (webRequest *webRequest) Anticipate(dataTemplate any, statusCodes ...any) WebRequest {
+	if len(statusCodes) == 0 {
+		webRequest.dataReceivers = append(
+			webRequest.dataReceivers,
+			dataReceiver{
+				dataTemplate: dataTemplate,
+				codeRange: StatusCodeRange{
+					Begin: 0,
+					End:   999,
+				},
+			},
+		)
+	}
+	for index, statusCode := range statusCodes {
+		var codeRange, rangeOk = statusCode.(StatusCodeRange)
+		if !rangeOk {
+			var codeValue, valueOk = statusCode.(int)
+			if !valueOk {
+				logWebcallRequest(
+					webRequest.session,
+					"webRequest",
+					"Anticipate",
+					"Invalid http status codes at #%d: %+v",
+					index,
+					statusCode,
+				)
+				continue
+			}
+			codeRange = StatusCodeRange{
+				Begin: codeValue,
+				End:   codeValue + 1,
+			}
+		}
+		if codeRange.End <= 0 {
+			codeRange.End = 999
+		}
+		webRequest.dataReceivers = append(
+			webRequest.dataReceivers,
+			dataReceiver{
+				dataTemplate: dataTemplate,
+				codeRange:    codeRange,
+			},
+		)
+	}
 	return webRequest
 }
 
@@ -249,12 +332,14 @@ func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 		webRequest.session,
 		webRequest.method,
 		webRequest.url,
+		"%s",
 		requestURL,
 	)
 	logWebcallRequest(
 		webRequest.session,
 		"Payload",
 		"Content",
+		"%s",
 		webRequest.payload,
 	)
 	requestObject.Header = make(http.Header)
@@ -267,6 +352,7 @@ func createHTTPRequest(webRequest *webRequest) (*http.Request, error) {
 		webRequest.session,
 		"Header",
 		"Content",
+		"%s",
 		marshalIgnoreError(
 			requestObject.Header,
 		),
@@ -313,6 +399,7 @@ func logSuccessResponse(session *session, response *http.Response, startTime tim
 		session,
 		"Header",
 		"Content",
+		"%s",
 		marshalIgnoreError(
 			responseHeaders,
 		),
@@ -321,6 +408,7 @@ func logSuccessResponse(session *session, response *http.Response, startTime tim
 		session,
 		"Body",
 		"Content",
+		"%s",
 		string(responseBody),
 	)
 	logWebcallFinish(
@@ -346,7 +434,6 @@ func doRequestProcessing(webRequest *webRequest) (*http.Response, error) {
 	var httpClient = getClientForRequest(
 		webRequest.sendClientCert,
 	)
-	var startTime = time.Now().UTC()
 	var responseObject, responseError = clientDoWithRetry(
 		httpClient,
 		requestObject,
@@ -358,13 +445,13 @@ func doRequestProcessing(webRequest *webRequest) (*http.Response, error) {
 		logErrorResponse(
 			webRequest.session,
 			responseError,
-			startTime,
+			getTimeNowUTC(),
 		)
 	} else {
 		logSuccessResponse(
 			webRequest.session,
 			responseObject,
-			startTime,
+			getTimeNowUTC(),
 		)
 	}
 	return responseObject, responseError
@@ -373,8 +460,8 @@ func doRequestProcessing(webRequest *webRequest) (*http.Response, error) {
 func getDataTemplate(session *session, statusCode int, dataReceivers []dataReceiver) any {
 	var dataTemplate any
 	for _, dataReceiver := range dataReceivers {
-		if dataReceiver.beginStatusCode <= statusCode &&
-			dataReceiver.endStatusCode > statusCode {
+		if dataReceiver.codeRange.Begin <= statusCode &&
+			dataReceiver.codeRange.End > statusCode {
 			dataTemplate = dataReceiver.dataTemplate
 		}
 	}
@@ -391,6 +478,15 @@ func getDataTemplate(session *session, statusCode int, dataReceivers []dataRecei
 }
 
 func parseResponse(session *session, body io.ReadCloser, dataTemplate any) error {
+	if isInterfaceValueNil(dataTemplate) {
+		logWebcallResponse(
+			session,
+			"Body",
+			"Skipped",
+			"No data receiver defined for this body",
+		)
+		return nil
+	}
 	var bodyBytes, bodyError = io.ReadAll(
 		body,
 	)
@@ -432,6 +528,12 @@ func (webRequest *webRequest) Process() (statusCode int, responseHeader http.Hea
 		}
 	} else {
 		if responseObject == nil {
+			logWebcallResponse(
+				webRequest.session,
+				"webRequest",
+				"Process",
+				"Nil response object received",
+			)
 			return 0, make(http.Header), nil
 		}
 		var dataTemplate = getDataTemplate(
