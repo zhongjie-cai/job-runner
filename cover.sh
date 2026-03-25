@@ -86,5 +86,8 @@ case $ReturnCode in
 	3)
 		echo "Some tests are not even passing! You should fix them NOW before anything committed!"
 		;;
+	*)		
+		echo "Unexpected exit code $ReturnCode!"
+		;;
 esac
 exit $ReturnCode
