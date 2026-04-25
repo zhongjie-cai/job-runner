@@ -193,9 +193,7 @@ func waitForNextRun(app *application) {
 		app.started = false
 		return
 	}
-	var waitDuration = timeNext.Sub(
-		time.Now(),
-	)
+	var waitDuration = time.Until(*timeNext)
 	logAppRoot(
 		app.session,
 		LogLevelInfo,

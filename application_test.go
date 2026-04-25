@@ -490,7 +490,7 @@ func TestWaitForNextRun_ValidNextSchedule(t *testing.T) {
 
 	// expect
 	m.Mock((*schedule).NextSchedule).Expects(dummySchedule).Returns(&dummyTimeNext).Once()
-	m.Mock(time.Now).Expects().Returns(dummyTimeNow).Once()
+	m.Mock(time.Until).Expects(dummyTimeNext).Returns(dummyDuration).Once()
 	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application", "waitForNextRun",
 		dummyMessageFormat, dummyTimeNext, dummyDuration).Returns().Once()
 	m.Mock(time.After).Expects(dummyDuration).Returns(dummyControlChannel).Once()
