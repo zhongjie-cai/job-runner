@@ -283,7 +283,7 @@ func TestPreBootstraping_Error(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).PreBootstrap).Expects(dummyCustomization).Returns(dummyError).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "preBootstraping",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelError, "application", "preBootstraping",
 		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
@@ -317,7 +317,7 @@ func TestPreBootstraping_Success(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).PreBootstrap).Expects(dummyCustomization).Returns(nil).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application",
 		"preBootstraping", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
@@ -358,7 +358,7 @@ func TestBootstrap_HappyPath(t *testing.T) {
 	m.Mock((*customization).SkipServerCertVerification).Expects(dummyCustomization).Returns(dummySkipCertVerification).Once()
 	m.Mock((*customization).ClientCert).Expects(dummyCustomization).Returns(dummyClientCertificate).Once()
 	m.Mock(initializeHTTPClients).Expects(dummyHttpClient, dummyWebcallTimeout, dummySkipCertVerification, dummyClientCertificate, gomocker.Anything()).Returns().Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "bootstrap", dummyMessageFormat).Returns().Once()
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application", "bootstrap", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
 	bootstrap(
@@ -387,7 +387,7 @@ func TestPostBootstraping_Error(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).PostBootstrap).Expects(dummyCustomization).Returns(dummyError).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "postBootstraping",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelError, "application", "postBootstraping",
 		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
@@ -421,7 +421,7 @@ func TestPostBootstraping_Success(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).PostBootstrap).Expects(dummyCustomization).Returns(nil).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application",
 		"postBootstraping", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
@@ -455,7 +455,7 @@ func TestWaitForNextRun_NilNextSchedule(t *testing.T) {
 
 	// expect
 	m.Mock((*schedule).NextSchedule).Expects(dummySchedule).Returns(dummyTimeNext).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application",
 		"waitForNextRun", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
@@ -491,7 +491,7 @@ func TestWaitForNextRun_ValidNextSchedule(t *testing.T) {
 	// expect
 	m.Mock((*schedule).NextSchedule).Expects(dummySchedule).Returns(&dummyTimeNext).Once()
 	m.Mock(time.Now).Expects().Returns(dummyTimeNow).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "waitForNextRun",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application", "waitForNextRun",
 		dummyMessageFormat, dummyTimeNext, dummyDuration).Returns().Once()
 	m.Mock(time.After).Expects(dummyDuration).Returns(dummyControlChannel).Once()
 
@@ -736,9 +736,9 @@ func TestBeginApplication_HappyPath(t *testing.T) {
 	// expect
 	m.Mock(runApplication).Expects(dummyApplication).Returns().SideEffects(
 		gomocker.GeneralSideEffect(1, func() { dummyShutdown <- true })).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application", "beginApplication",
 		"Trying to start runner [%v] (v-%v)", dummyName, dummyVersion).Returns().Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "beginApplication", "Runner terminated").Returns().Once()
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application", "beginApplication", "Runner terminated").Returns().Once()
 
 	// SUT + act
 	beginApplication(
@@ -770,7 +770,7 @@ func TestEndApplication_Error(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).AppClosing).Expects(dummyCustomization).Returns(dummyError).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application", "endApplication",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelError, "application", "endApplication",
 		dummyMessageFormat, dummyError).Returns().Once()
 
 	// SUT + act
@@ -803,7 +803,7 @@ func TestEndApplication_Success(t *testing.T) {
 
 	// expect
 	m.Mock((*customization).AppClosing).Expects(dummyCustomization).Returns(nil).Once()
-	m.Mock(logAppRoot).Expects(dummySession, "application",
+	m.Mock(logAppRoot).Expects(dummySession, LogLevelInfo, "application",
 		"endApplication", dummyMessageFormat).Returns().Once()
 
 	// SUT + act
